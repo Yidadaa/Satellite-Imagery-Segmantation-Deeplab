@@ -78,7 +78,7 @@ def is_img_empty(img_array:np.ndarray, threshold:float)->bool:
     w, h = img_array.shape[0:2]
     opacity_mask = img_array[:, :, 3] # 抽取透明度通道
     opacity_ratio = np.sum([opacity_mask == 0]) / w / h # 统计透明像素占比
-    return opacity_ratio < threshold
+    return opacity_ratio >= threshold
 
 def extract_and_save(img_path:str, label_path:str, output_path:str):
     '''读取图像并进行切分处理
@@ -116,7 +116,7 @@ def extract_and_save(img_path:str, label_path:str, output_path:str):
 
     # 统计图像总数目
     img_count = 0
-
+   
     for scale in scales:
         # 这里会根据实际图像大小进行裁剪
         [w, h] = src_img.shape[0:2]
@@ -142,7 +142,7 @@ def extract_and_save(img_path:str, label_path:str, output_path:str):
 
 def parse_args():
     '''解析命令行参数'''
-    arg_parser = ArgumentParser(usage='python3 make_train_test.py -i path/to/large/img -l path/to/label/img -o path/to/output')
+    arg_parser = ArgumentParser(usage='python3 extract_imgs.py -i path/to/large/img -l path/to/label/img -o path/to/output')
     arg_parser.add_argument('-i', '--img', help='卫星图路径')
     arg_parser.add_argument('-l', '--label', help='卫星图标签图路径')
     arg_parser.add_argument('-o', '--output', help='输出路径')
