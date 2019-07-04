@@ -1,2 +1,4 @@
 *.zip
 jingwei*
+data/train
+data/test
