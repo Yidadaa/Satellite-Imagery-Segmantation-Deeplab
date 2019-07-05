@@ -101,6 +101,15 @@ def train(model:nn.Module, dataloader:DataLoader, optimizer:Optimizer, ep:int, d
 
 def validate(model:nn.Module, test_dataloader:DataLoader, optimizer:Optimizer, ep:int, device:torch.device):
     '''验证模型
+
+    Args:
+        model(nn.Module): 待测试模型
+        dataloader(DataLoader): 数据加载器
+        optimizer(Optimizer): 优化器
+        device(torch.Device): 运行环境
+
+    Return:
+        test_info(list): 测试时的log
     '''
     print('Size of test set: ', len(test_dataloader))
 
