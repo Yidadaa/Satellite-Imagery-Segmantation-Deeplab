@@ -27,3 +27,6 @@ pip install opencv-python
 
 ## 训练策略
 [TODO]
+
+# 疑问
+1. pvvips读入的图片是`RGB`还是`BGR`排列？
