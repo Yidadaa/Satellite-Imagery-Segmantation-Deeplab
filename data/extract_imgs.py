@@ -125,7 +125,6 @@ def extract_and_save(img_path:str, label_path:str, output_path:str):
         height_iter = build_iter(h, scale)
         w_h_iter = product(width_iter, height_iter) # product生成两个迭代器的笛卡尔积
         total = len(width_iter) * len(height_iter) # 裁剪后图像总数量
-        img_count += total
         imgs = []
         for (x, y) in tqdm(w_h_iter, desc='Scale[{}*{}]'.format(scale, scale), total=total):
             # 执行裁剪
@@ -133,6 +132,7 @@ def extract_and_save(img_path:str, label_path:str, output_path:str):
             cropped_label_img = label_img[x:x + scale, y:y + scale, :]
             # 过滤掉空白区域
             if not is_img_empty(cropped_src_img, 0.95):
+                img_count += 1
                 # 收集所有的像素值，用于计算均值和方差
                 w, h, c = cropped_src_img.shape
                 reshaped_crop = cropped_src_img.reshape((w * h, c))[:, 0:3]
@@ -145,7 +145,6 @@ def extract_and_save(img_path:str, label_path:str, output_path:str):
         # 计算数据集的均值和方差
         print('concating imgs')
         imgs = np.concatenate(imgs)
-        print(imgs.shape)
         mean = list(np.mean(imgs, axis=0))
         std = list(np.std(imgs, axis=0))
         print('Mean: {}, Std: {}'.format(mean, std))

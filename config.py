@@ -6,9 +6,12 @@
 im_w = 480
 im_h = 480
 
+# 类别
+num_classes = 4
+
 # dataloader参数
 dataloader_config = {
-    'batch_size': 128,
+    'batch_size': 16,
     'shuffle': True,
     'num_workers': 4,
     'pin_memory': True

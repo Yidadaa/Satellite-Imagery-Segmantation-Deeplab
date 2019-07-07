@@ -6,11 +6,12 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 from tqdm import tqdm
 from PIL import Image
+import numpy as np
 
 import config
 
 class SegDataset(Dataset):
-    def __init__(self, data_paths:list, label_paths:list, mean:tuple, std:tuple):
+    def __init__(self, data_paths:list, label_paths:list, mean:list, std:list):
         '''自定义数据集
         '''
         self.data_paths = data_paths
@@ -38,12 +39,13 @@ class SegDataset(Dataset):
         label = Image.open(lpath)
         return self.transformX(img), self.transformY(label), img.size
 
-    def transformX(self, img):
+    def transformX(self, img:Image.Image)->torch.Tensor:
+        img = img.resize((config.im_w, config.im_h), resample=Image.BILINEAR)
         return transforms.Compose([
-            transforms.Resize((config.im_w, config.im_h)),
             transforms.ToTensor(),
             transforms.Normalize(mean=self.mean, std=self.std)
         ])(img)
 
-    def transformY(self, label):
-        return transforms.Compose([transforms.ToTensor()])(label)
+    def transformY(self, label:Image.Image)->Image.Image:
+        label = label.resize((config.im_w, config.im_h), resample=Image.NEAREST) # type: Image.Image
+        return torch.Tensor(np.array(label, dtype=np.uint8)).long()
