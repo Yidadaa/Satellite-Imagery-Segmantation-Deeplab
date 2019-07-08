@@ -14,7 +14,7 @@ dataloader_config = {
     'batch_size': 32,
     'shuffle': True,
     'num_workers': 4,
-    'pin_memory': True,
+    'pin_memory': False,
     'drop_last': True
 }
 
@@ -26,7 +26,7 @@ dataset_config = {
 
 # 训练时参数
 train_config = {
-    'max_epoch': 10,
+    'max_epoch': 20,
     'lr': 1e-5,
     'log_interval': 2
 }

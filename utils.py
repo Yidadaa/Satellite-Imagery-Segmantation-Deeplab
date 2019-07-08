@@ -81,8 +81,29 @@ def build_dataloader(data_path:str)->DataLoader:
     the_dataset = SegDataset(img_list, label_list, **config.dataset_config)
     return DataLoader(the_dataset, **config.dataloader_config)
 
-def mIoU(a:np.ndarray, b:np.ndarray)->float:
-    '''计算两者的mIoU
+def get_metrics(gd_array:np.ndarray, pred_array:np.ndarray)->(float, list, float):
+    '''计算图片的平均IoU
+
+    Args:
+        gd_array(np.ndarray): Ground Truth
+        pred_array(np.ndarray): 预测数据
+
+    Return:
+        mIoU(float): 平均IoU
+        IoUs(list): 每一类的IoU
+        mpa(float): 平均每类的像素正确率
     '''
-    # TODO: 需要实现
-    return 0.0
+    num_classes = 4
+    IoUs = []
+    pa = 0
+    assert pred_array.shape == gd_array.shape, '预测图片({})和GD({})大小不一致'.format(pred_array.shape, gd_array.shape)
+    for c in range(1, num_classes):
+        TP = np.sum(pred_array[gd_array == c] == c) # 预测和GD都为c的值
+        FP = np.sum(pred_array[gd_array == c] != c) # 预测不为c，GD为c
+        FN = np.sum(pred_array[gd_array != c] != c) # 预测不为c，GD也不为c
+        IoU = TP / sum([TP, FP, FN])
+        IoUs.append(IoU)
+        pa += TP / pred_array.size
+    mIoU = sum(IoUs) / (num_classes - 1)
+    mpa = pa / (num_classes - 1)
+    return mIoU, IoUs, mpa

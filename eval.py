@@ -12,7 +12,7 @@ import os
 import argparse
 
 from model import DeepLabV3Res101
-from utils import setup, restore_from
+from utils import setup, restore_from, get_metrics
 from dataloader import SegDataset
 import config
 
@@ -72,35 +72,12 @@ def draw_output(img_path:str, pred_img:np.ndarray, src_img:np.ndarray):
         else:
             ax.imshow(img)
     output_filename = os.path.join(output_path, os.path.basename(img_path))
-    miou, ious = get_miou(gd_array, pred_img)
+    miou, ious, mpa = get_metrics(gd_array, pred_img)
 
-    fig.suptitle('$mIoU={}$\n$IoUs={}$'.format(miou, ious))
+    fig.suptitle('$mIoU={:.2f}, mpa={:.2f}$\n$IoUs={}$'.format(miou, mpa, ious))
 
     fig.savefig(output_filename)
     print('Output has been saved to {}.'.format(output_filename))
-
-def get_miou(gd_img:np.ndarray, pred_img:np.ndarray)->(float, list):
-    '''计算图片的平均IoU
-
-    Args:
-        gd_img(np.ndarray): Ground Truth
-        pred_img(np.ndarray): 预测数据
-
-    Return:
-        mIoU(float): 平均IoU
-        IoUs(list): 每一类的IoU
-    '''
-    classes = range(1, 4)
-    IoUs = []
-    assert pred_img.shape == gd_img.shape, '预测图片({})和GD({})大小不一致'.format(pred_img.shape, gd_img.shape)
-    for c in classes:
-        TP = np.sum(pred_img[gd_img == c] == c) # 预测和GD都为c的值
-        FP = np.sum(pred_img[gd_img == c] != c) # 预测不为c，GD为c
-        FN = np.sum(pred_img[gd_img != c] != c) # 预测不为c，GD也不为c
-        IoU = TP / sum([TP, FP, FN])
-        IoUs.append(IoU)
-    mIoU = sum(IoUs) / len(classes)
-    return mIoU, IoUs
 
 def parse_args():
     parser = argparse.ArgumentParser(usage='python3 eval.py -i path/to/image -r path/to/checkpoint')

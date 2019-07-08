@@ -16,7 +16,7 @@ import json
 
 from dataloader import SegDataset
 from model import DeepLabV3Res101
-from utils import setup, restore_from, save_to, mIoU
+from utils import setup, restore_from, save_to, get_metrics
 import config
 
 def train_on_epochs(train_loader:DataLoader, val_loader:DataLoader, ckpt:str=None):
@@ -48,10 +48,10 @@ def train_on_epochs(train_loader:DataLoader, val_loader:DataLoader, ckpt:str=Non
     # 开始执行训练
     for ep in range(start_ep, config.train_config['max_epoch']):
         train_info = train(model, train_loader, optimizer, ep, device)
-        # val_info = validate(model, val_loader, optimizer, ep, device)
+        val_info = validate(model, val_loader, optimizer, ep, device)
         # 保存信息
         info['train'] += train_info
-        # info['val'] += val_info
+        info['val'] += val_info
         # 保存模型
         save_to(model, save_path, ep)
 
@@ -88,16 +88,19 @@ def train(model:nn.Module, dataloader:DataLoader, optimizer:Optimizer, ep:int, d
         loss.backward()
         optimizer.step()
 
-        y_ = y_.argmax(dim=1)
-        acc, miou = 0, 0
+        y_ = y_.argmax(dim=1).cpu().numpy()
+        y = y.cpu().numpy()
+        
+        # 计算运行时指标
+        miou, _, mpa = get_metrics(y, y_)
 
         # 保存训练时数据
-        train_info.append([ep, loss.item(), acc, miou])
+        train_info.append([ep, loss.item(), mpa, miou])
 
         # 输出信息
         if (step + 1) % config.train_config['log_interval'] == 0:
-            print('[Epoch %2d - %2d of %2d]acc: %.2f, miou: %.2f, loss: %.2f'\
-                % (ep, step + 1, len(dataloader), acc, miou, loss.item()))
+            print('[Epoch %2d - %2d of %2d]mpa: %.2f, miou: %.2f, loss: %.2f'\
+                % (ep, step + 1, len(dataloader), mpa, miou, loss.item()))
     return train_info
 
 def validate(model:nn.Module, test_dataloader:DataLoader, optimizer:Optimizer, ep:int, device:torch.device):
@@ -114,7 +117,7 @@ def validate(model:nn.Module, test_dataloader:DataLoader, optimizer:Optimizer, e
     '''
     print('Size of test set: ', len(test_dataloader))
 
-    y_gd, y_pred = [], []
+    mious, mpas = [], []
     test_info = []
     total_loss = 0
     model.eval()
@@ -125,16 +128,18 @@ def validate(model:nn.Module, test_dataloader:DataLoader, optimizer:Optimizer, e
         loss = F.cross_entropy(y_, y, reduction='sum')
         total_loss += loss.item()
         y_ = y_.argmax(dim=1)
-        y_gd += y.cpu().numpy().tolist()
-        y_pred += y_.cpu().numpy().tolist()
+        y_gd = y.cpu().numpy()
+        y_pred = y_.cpu().numpy()
+        miou, _, mpa = get_metrics(y_gd, y_pred)
+        mious.append(miou)
+        mpas.append(mpa)
 
     avg_loss = total_loss / len(test_dataloader)
-    # acc = accuracy_score(y_gd, y_pred)
-    # miou = mIoU(y_gd, y_pred)
-    acc, miou = 0, 0
-    test_info.append([ep, avg_loss, acc, miou])
+    miou = np.average(mious)
+    mpa = np.average(mpas)
+    test_info.append([ep, avg_loss, mpa, miou])
 
-    print('[Epoch %2d]Test avg loss: %.4f, acc: %.2f, mIoU: %.2f' % (ep, avg_loss, acc, miou))
+    print('[Epoch %2d]Test avg loss: %.4f, mpa: %.2f, mIoU: %.2f' % (ep, avg_loss, mpa, miou))
 
     return test_info
 
