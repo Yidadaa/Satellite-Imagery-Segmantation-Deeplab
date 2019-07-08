@@ -122,17 +122,18 @@ def validate(model:nn.Module, test_dataloader:DataLoader, optimizer:Optimizer, e
     total_loss = 0
     model.eval()
 
-    for X, y, size in tqdm(test_dataloader, desc='Validating'):
-        X, y = X.to(device), y.to(device)
-        y_ = model(X)
-        loss = F.cross_entropy(y_, y, reduction='sum')
-        total_loss += loss.item()
-        y_ = y_.argmax(dim=1)
-        y_gd = y.cpu().numpy()
-        y_pred = y_.cpu().numpy()
-        miou, _, mpa = get_metrics(y_gd, y_pred)
-        mious.append(miou)
-        mpas.append(mpa)
+    with torch.no_grad():
+        for X, y, _ in tqdm(test_dataloader, desc='Validating'):
+            X, y = X.to(device), y.to(device)
+            y_ = model(X)
+            loss = F.cross_entropy(y_, y, reduction='sum')
+            total_loss += loss.item()
+            y_ = y_.argmax(dim=1)
+            y_gd = y.cpu().numpy()
+            y_pred = y_.cpu().numpy()
+            miou, _, mpa = get_metrics(y_gd, y_pred)
+            mious.append(miou)
+            mpas.append(mpa)
 
     avg_loss = total_loss / len(test_dataloader)
     miou = np.average(mious)
@@ -143,20 +144,21 @@ def validate(model:nn.Module, test_dataloader:DataLoader, optimizer:Optimizer, e
 
     return test_info
 
-def setup_dataloader(data_path:str):
+def setup_dataloader(train_path:str, val_path:str):
     '''构建训练用数据集，包含训练集和测试集
 
     Args:
-        data_path(str): 数据集路径
+        train_path(str): 训练数据集路径
+        val_path(str): 验证数据集路径
     
     Return:
         train_loader(Dataloader): 训练集加载器
         val_loader(Dataloader): 验证集加载器
     '''
-    names = ['train', 'val']
+    names = [('train', train_path), ('val', val_path)]
     dataset = {}
-    for name in names:
-        img_path, label_path = [os.path.join(args.data_path, name, key) for key in ['img', 'label']]
+    for (name, root_path) in names:
+        img_path, label_path = [os.path.join(root_path, key) for key in ['img', 'label']]
         data_list, label_list = [
             [os.path.join(path, file) for file in os.listdir(path)]
             for path in [img_path, label_path]]
@@ -164,8 +166,9 @@ def setup_dataloader(data_path:str):
     return dataset['train'], dataset['val']
 
 def parse_args():
-    parser = argparse.ArgumentParser(usage='python3 train.py -i path/to/data -r path/to/checkpoint')
-    parser.add_argument('-i', '--data_path', help='path to your datasets', default='./data')
+    parser = argparse.ArgumentParser(usage='python3 train.py -t path/to/train/data -v path/to/val/data -r path/to/checkpoint')
+    parser.add_argument('-t', '--train_path', help='path to your datasets', default='./data/train')
+    parser.add_argument('-v', '--val_path', help='path to your datasets', default='./data/val')
     parser.add_argument('-r', '--restore_from', help='path to the checkpoint', default=None)
     args = parser.parse_args()
     return args
@@ -173,8 +176,8 @@ def parse_args():
 if __name__ == "__main__":
     names = ['train', 'val']
     args = parse_args()
-    assert os.path.exists(args.data_path), '请指定数据集路径'
-    assert all([key in os.listdir(args.data_path) for key in names]), '请检查数据集中是否包含训练集和验证集'
+    assert os.path.exists(args.train_path), '请指定训练数据集路径'
+    assert os.path.exists(args.val_path), '请指定测试数据集路径'
     print('Setting up dataloaders.')
-    train_loader, val_loader = setup_dataloader(args.data_path)
+    train_loader, val_loader = setup_dataloader(args.train_path, args.val_path)
     train_on_epochs(train_loader, val_loader, args.restore_from)

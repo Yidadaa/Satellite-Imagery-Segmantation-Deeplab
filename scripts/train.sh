@@ -1,1 +1,1 @@
-python train.py -i ./data -r ./checkpoints/ep-first.pth
+python train.py -t ./data/image_1 -v ./data/val

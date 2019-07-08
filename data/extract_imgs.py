@@ -111,7 +111,7 @@ def extract_and_save(img_path:str, label_path:str, output_path:str):
     label_img = load_to_memory(label_img)
 
     # 开始裁剪图片
-    scales = [480, 960, 1280] # 多尺度裁切
+    scales = [320, 480, 600, 960, 1280] # 多尺度裁切
     build_iter = lambda n, s: range(0, (n // s + 1) * s, s) # 范围覆盖(0, n)且步长为s的迭代器
 
     # 统计图像总数目

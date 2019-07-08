@@ -1,10 +1,5 @@
-*.zip
-jingwei*
-data/train
-data/val
 __pycache__
 
 checkpoints/*.pth
-output/*.png
 
 info.json
