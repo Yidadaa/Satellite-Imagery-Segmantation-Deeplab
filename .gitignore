@@ -3,3 +3,8 @@ jingwei*
 data/train
 data/val
 __pycache__
+
+*.pth
+output/*.png
+
+info.json

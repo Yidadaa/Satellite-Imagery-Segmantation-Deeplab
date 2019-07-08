@@ -11,10 +11,11 @@ num_classes = 4
 
 # dataloader参数
 dataloader_config = {
-    'batch_size': 16,
+    'batch_size': 32,
     'shuffle': True,
     'num_workers': 4,
-    'pin_memory': True
+    'pin_memory': True,
+    'drop_last': True
 }
 
 # 数据集参数配置

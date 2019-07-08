@@ -1,1 +1,1 @@
-CUDA_VISIABLE=0 python train.py -i ./data
+python train.py -i ./data

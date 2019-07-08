@@ -48,10 +48,10 @@ def train_on_epochs(train_loader:DataLoader, val_loader:DataLoader, ckpt:str=Non
     # 开始执行训练
     for ep in range(start_ep, config.train_config['max_epoch']):
         train_info = train(model, train_loader, optimizer, ep, device)
-        val_info = validate(model, val_loader, optimizer, ep, device)
+        # val_info = validate(model, val_loader, optimizer, ep, device)
         # 保存信息
         info['train'] += train_info
-        info['val'] += val_info
+        # info['val'] += val_info
         # 保存模型
         save_to(model, save_path, ep)
 
@@ -117,6 +117,7 @@ def validate(model:nn.Module, test_dataloader:DataLoader, optimizer:Optimizer, e
     y_gd, y_pred = [], []
     test_info = []
     total_loss = 0
+    model.eval()
 
     for X, y, size in tqdm(test_dataloader, desc='Validating'):
         X, y = X.to(device), y.to(device)
@@ -128,8 +129,9 @@ def validate(model:nn.Module, test_dataloader:DataLoader, optimizer:Optimizer, e
         y_pred += y_.cpu().numpy().tolist()
 
     avg_loss = total_loss / len(test_dataloader)
-    acc = accuracy_score(y_gd, y_pred)
-    miou = mIoU(y_gd, y_pred)
+    # acc = accuracy_score(y_gd, y_pred)
+    # miou = mIoU(y_gd, y_pred)
+    acc, miou = 0, 0
     test_info.append([ep, avg_loss, acc, miou])
 
     print('[Epoch %2d]Test avg loss: %.4f, acc: %.2f, mIoU: %.2f' % (ep, avg_loss, acc, miou))
