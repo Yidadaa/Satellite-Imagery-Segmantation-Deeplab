@@ -4,7 +4,7 @@ data/train
 data/val
 __pycache__
 
-*.pth
+checkpoints/*.pth
 output/*.png
 
 info.json

@@ -38,7 +38,7 @@ def train_on_epochs(train_loader:DataLoader, val_loader:DataLoader, ckpt:str=Non
     # 训练时的各种指标
     info = {'train': [], 'val': []}
 
-    save_path = './checkpints'
+    save_path = './checkpoints'
     if not os.path.exists(save_path):
         os.mkdir(save_path)
 
@@ -177,4 +177,4 @@ if __name__ == "__main__":
     assert all([key in os.listdir(args.data_path) for key in names]), '请检查数据集中是否包含训练集和验证集'
     print('Setting up dataloaders.')
     train_loader, val_loader = setup_dataloader(args.data_path)
-    train_on_epochs(train_loader, val_loader)
+    train_on_epochs(train_loader, val_loader, args.restore_from)

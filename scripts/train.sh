@@ -1,1 +1,1 @@
-python train.py -i ./data
+python train.py -i ./data -r ./checkpoints/ep-first.pth
