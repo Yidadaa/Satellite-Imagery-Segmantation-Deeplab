@@ -80,19 +80,14 @@ def is_img_empty(img_array:np.ndarray, threshold:float)->bool:
     opacity_ratio = np.sum([opacity_mask == 0]) / w / h # 统计透明像素占比
     return opacity_ratio >= threshold
 
-def extract_and_save(img_path:str, label_path:str, output_path:str):
+def extract_imgs(img_path:str, label_path:str, output_path:str):
     '''读取图像并进行切分处理
 
     Args:
         img_path(str): 要处理的图像路径
         label_path(str): 对应的标签图像
+        output_path(str): 输出目录
     '''
-    # 获取要处理的图片文件名
-    img_file_name = os.path.basename(img_path).rsplit('.')[0]
-    # 获取输出目录的路径
-    src_output_path = os.path.join(output_path, 'img')
-    label_output_path = os.path.join(output_path, 'label')
-
     print('Loading source image from {}.'.format(img_path))
     src_img = vipImage.new_from_file(img_path)
     
@@ -109,9 +104,23 @@ def extract_and_save(img_path:str, label_path:str, output_path:str):
     print('Loading image to memory, it may take a few minutes.')
     src_img = load_to_memory(src_img)
     label_img = load_to_memory(label_img)
+    crop_and_save(src_img, label_img, output_path, img_path)
+
+def crop_and_save(src_img:np.ndarray, label_img:np.ndarray, output_path:str, img_path:str):
+    '''裁剪图片并保存
+    Args:
+        src_img, label_img(np.ndarray): 原始图片数组和标签数组
+        output_path(str): 输出目录
+        img_path(str): 原始图像路径
+    '''
+    # 获取要处理的图片文件名
+    img_file_name = os.path.basename(img_path).rsplit('.')[0]
+    # 获取输出目录的路径
+    src_output_path = os.path.join(output_path, 'img')
+    label_output_path = os.path.join(output_path, 'label')
 
     # 开始裁剪图片
-    scales = [320, 480, 600, 960, 1280] # 多尺度裁切
+    scales = [480, 600, 960, 1280] # 多尺度裁切
     build_iter = lambda n, s: range(0, (n // s + 1) * s, s) # 范围覆盖(0, n)且步长为s的迭代器
 
     # 统计图像总数目
@@ -143,7 +152,7 @@ def extract_and_save(img_path:str, label_path:str, output_path:str):
                 cv2.imwrite(os.path.join(src_output_path, filename), cropped_src_img[:, :, 0:3])
                 cv2.imwrite(os.path.join(label_output_path, filename), cropped_label_img)
         # 计算数据集的均值和方差
-        print('concating imgs')
+        print('Concating images.')
         imgs = np.concatenate(imgs)
         mean = list(np.mean(imgs, axis=0))
         std = list(np.std(imgs, axis=0))
@@ -166,4 +175,4 @@ if __name__ == "__main__":
     assert os.path.exists(args.label), '请指定有效的标签图片路径'
     assert args.output is not None, '请指定有效果的输出路径'
     create_folders(args.output)
-    extract_and_save(args.img, args.label, args.output)
+    extract_imgs(args.img, args.label, args.output)
