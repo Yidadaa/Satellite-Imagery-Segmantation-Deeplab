@@ -5,7 +5,7 @@ import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
 from tqdm import tqdm
-from PIL import Image
+from PIL import Image, ImageFilter
 import numpy as np
 
 import config
@@ -37,20 +37,30 @@ class SegDataset(Dataset):
         lpath = self.label_paths[index]
         img = Image.open(ipath).convert('RGB')
         label = Image.open(lpath)
-        return self.transformX(img), self.transformY(label), img.size
+        X, y = self.transform(img, label)
+        return X, y, img.size
 
-    def transformX(self, img:Image.Image)->torch.Tensor:
-        img = img.resize((config.im_w, config.im_h), resample=Image.BILINEAR)
-        params = self.get_random_color_jitter_params()
+    def transform(self, img:Image.Image, label:Image.Image)->(torch.Tensor, torch.Tensor):
+        label = label.resize((config.im_w, config.im_h), resample=Image.NEAREST) # type: Image.Image
+        img = img.resize((config.im_w, config.im_h), resample=Image.BILINEAR) # type: Image.Image
+
+        # 随机高斯模糊
+        if np.random.rand() < 0.5:
+            img = img.filter(ImageFilter.GaussianBlur(radius=np.random.rand()))
+
+        # 随机旋转一定角度或者翻转
+        for flag in [Image.FLIP_LEFT_RIGHT, Image.FLIP_TOP_BOTTOM,
+                Image.ROTATE_90, Image.ROTATE_180, Image.ROTATE_270]:
+            if np.random.rand() < 0.5: continue
+            img = img.transpose(flag)
+            label = label.transpose(flag)
+
+        params = self.get_random_color_jitter_params() # 随机调整亮度、对比度、色调等数值
         return transforms.Compose([
             transforms.ColorJitter(**params),
             transforms.ToTensor(),
             transforms.Normalize(mean=self.mean, std=self.std)
-        ])(img)
-
-    def transformY(self, label:Image.Image)->Image.Image:
-        label = label.resize((config.im_w, config.im_h), resample=Image.NEAREST) # type: Image.Image
-        return torch.Tensor(np.array(label, dtype=np.uint8)).long()
+        ])(img), torch.Tensor(np.array(label, dtype=np.uint8)).long()
 
     def get_random_color_jitter_params(self)->dict:
         '''随机生成ColorJitter函数的参数
