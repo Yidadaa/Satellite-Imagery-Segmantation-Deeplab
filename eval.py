@@ -9,6 +9,7 @@ from PIL import Image
 import numpy as np
 from matplotlib import pyplot as plt
 from tqdm import tqdm
+from pyvips import Image as vipImage
 
 import os
 import argparse
@@ -53,36 +54,40 @@ def run_on_single_image(img_path:str, ckpt:str):
         'Source Image': np.array(src_img)
     })
 
-def run_and_refine_single_image(img_path:str, ckpt:str):
+def run_and_refine_single_image(img_path:str, ckpt:str, show_output:bool = True)->np.ndarray:
     '''对一张大图进行处理并进行多尺度融合
 
     Args:
         img_path(str): 图片路径
         ckpt(str): 检查点路径
     '''
+    def print_(s):
+        if show_output:
+            print(s)
+
     for (path, tip) in zip([img_path, ckpt], ['图片', '检查点']):
         assert path and os.path.exists(path), '%s路径不存在: %s' % (tip, path)
-    print('Setting up model.')
+    print_('Setting up model.')
     model = DeepLabV3Res101()
     model, device = setup(model)
-    print('Loading model from {}.'.format(ckpt))
+    print_('Loading model from {}.'.format(ckpt))
     model, _ = restore_from(model, ckpt)
     model.eval()
 
     # 获取所有相关图片，读取为PIL对象
-    print('Reading images.')
+    print_('Reading images.')
     all_imgs = [img_path] + get_intersect_imgs(img_path) # 图片路径，用于恢复图片尺度信息，首位是原始图像
     imgs = [Image.open(path).convert('RGB') for path in all_imgs]
     img_sizes = [img.size for img in imgs] # 保存size，用于将图片复原
 
     # 准备转换函数，并转换为tensor
-    print('Loading images to device.')
+    print_('Loading images to device.')
     transform = SegDataset([], [], 'val', **config.dataset_config).transform_on_eval
     imgs = torch.stack([transform(img)[0] for img in imgs], dim=0) # 统一转换为统一长宽的图像
     imgs.to(device)
 
     # 执行推理，并将推理结果恢复成原尺度图像
-    print('Do inferening.')
+    print_('Do inferening.')
     with torch.no_grad():
         y_pred = model(imgs) # type: torch.Tensor
         y_pred_arrays = y_pred.argmax(dim=1).cpu().numpy().astype(np.uint8) # type: np.ndarray
@@ -124,6 +129,8 @@ def run_and_refine_single_image(img_path:str, ckpt:str):
         'Refined Image': final_img,
         'Original Image': np.array(Image.open(img_path).convert('RGB'))
     })
+    # 返回refine过的图像
+    return final_img
 
 def extract_info_from_filename(filename:str)->(int, int, int, str):
     '''从文件名中获取信息
@@ -204,6 +211,29 @@ def draw_output(img_path:str, imgs:dict):
     fig.suptitle('$mIoU={:.2f}, mpa={:.2f}$\n$IoUs={}$'.format(miou, mpa, ious))
     fig.savefig(output_filename)
     print('Output has been saved to {}.'.format(output_filename))
+
+def run_on_large_image(root_path:str, original_img:str, ckpt:str):
+    '''在一整张图上执行运算
+    '''
+    assert os.path.exists(root_path), '路径不存在: {}'.format(root_path)
+    assert os.path.exists(original_img), '路径不存在: {}'.format(original_img)
+    file_list = os.listdir(root_path)
+    original_img_array = vipImage.new_from_array(original_img)
+    ow, oh = [getattr(original_img_array, key) for key in ['width', 'height']]
+    large_array = np.zeros((oh, ow))
+    # 统计尺度
+    scales = set()
+    for file in file_list:
+        scale, _, _, _ = extract_info_from_filename(file)
+        scales.add(scale)
+    # 使用最大尺度的图片作为索引
+    max_scale = max(scales)
+    for file in tqdm(file_list, desc='Processing'):
+        scale, x, y, _ = extract_info_from_filename(file)
+        if scale != max_scale: continue
+        refined_image = run_and_refine_single_image(os.path.join(root_path, file), ckpt, False)
+        large_array[x:x + scale, y:y + scale] = refined_image
+    print(large_array.shape)
 
 def parse_args():
     parser = argparse.ArgumentParser(usage='python3 eval.py -i path/to/image -r path/to/checkpoint')
