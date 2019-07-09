@@ -11,11 +11,12 @@ import numpy as np
 import config
 
 class SegDataset(Dataset):
-    def __init__(self, data_paths:list, label_paths:list, mean:list, std:list):
+    def __init__(self, data_paths:list, label_paths:list, name:str, mean:list, std:list):
         '''自定义数据集
         '''
         self.data_paths = data_paths
         self.label_paths = label_paths
+        self.name = name
         self.mean = mean
         self.std = std
 
@@ -37,16 +38,21 @@ class SegDataset(Dataset):
         lpath = self.label_paths[index]
         img = Image.open(ipath).convert('RGB')
         label = Image.open(lpath)
-        X, y = self.transform(img, label)
+        if self.name == 'train':
+            X, y = self.transform(img, label)
+        elif self.name == 'val':
+            X, y = self.transform_on_eval(img, label)
+        else:
+            raise NotImplementedError
         return X, y, img.size
 
     def transform(self, img:Image.Image, label:Image.Image)->(torch.Tensor, torch.Tensor):
         label = label.resize((config.im_w, config.im_h), resample=Image.NEAREST) # type: Image.Image
         img = img.resize((config.im_w, config.im_h), resample=Image.BILINEAR) # type: Image.Image
 
-        # 随机高斯模糊
-        if np.random.rand() < 0.5:
-            img = img.filter(ImageFilter.GaussianBlur(radius=np.random.rand()))
+        # # 随机高斯模糊
+        # if np.random.rand() < 0.5:
+        #     img = img.filter(ImageFilter.GaussianBlur(radius=np.random.rand()))
 
         # 随机旋转一定角度或者翻转
         for flag in [Image.FLIP_LEFT_RIGHT, Image.FLIP_TOP_BOTTOM,
@@ -55,12 +61,23 @@ class SegDataset(Dataset):
             img = img.transpose(flag)
             label = label.transpose(flag)
 
-        params = self.get_random_color_jitter_params() # 随机调整亮度、对比度、色调等数值
+        # params = self.get_random_color_jitter_params() # 随机调整亮度、对比度、色调等数值
         return transforms.Compose([
-            transforms.ColorJitter(**params),
+            # transforms.ColorJitter(**params),
             transforms.ToTensor(),
             transforms.Normalize(mean=self.mean, std=self.std)
         ])(img), torch.Tensor(np.array(label, dtype=np.uint8)).long()
+
+    def transform_on_eval(self, img:Image.Image, label:Image.Image = None)->(torch.Tensor, torch.Tensor):
+        img = img.resize((config.im_w, config.im_h), resample=Image.BILINEAR) # type: Image.Image
+        if label is not None:
+            label = label.resize((config.im_w, config.im_h), resample=Image.NEAREST) # type: Image.Image
+            label = torch.Tensor(np.array(label, dtype=np.uint8)).long()
+
+        return transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(mean=self.mean, std=self.std)
+        ])(img), label
 
     def get_random_color_jitter_params(self)->dict:
         '''随机生成ColorJitter函数的参数

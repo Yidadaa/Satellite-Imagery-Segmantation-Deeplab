@@ -38,7 +38,7 @@ def run_on_single_image(img_path:str, ckpt:str):
 
     # 读取并转换图片
     src_img = Image.open(img_path).convert('RGB')
-    img = SegDataset([], [], **config.dataset_config).transformX(src_img) # type: torch.Tensor
+    img, _ = SegDataset([], [], 'val', **config.dataset_config).transform_on_eval(src_img) # type: torch.Tensor
     img = torch.stack([img], dim=0)
     img.to(device)
     # 执行推理
@@ -48,8 +48,10 @@ def run_on_single_image(img_path:str, ckpt:str):
         y_pred_img = np.array(Image.fromarray(y_pred.astype(np.uint8)).resize(src_img.size))
 
     # 绘制结果图
-    src_img = np.array(src_img)
-    draw_output(img_path, y_pred_img, src_img)
+    draw_output(img_path, {
+        'Predict Image': y_pred_img,
+        'Source Image': np.array(src_img)
+    })
 
 def run_and_refine_single_image(img_path:str, ckpt:str):
     '''对一张大图进行处理并进行多尺度融合
@@ -75,8 +77,8 @@ def run_and_refine_single_image(img_path:str, ckpt:str):
 
     # 准备转换函数，并转换为tensor
     print('Loading images to device.')
-    transform = SegDataset([], [], **config.dataset_config).transformX
-    imgs = torch.stack([transform(img) for img in imgs], dim=0) # 统一转换为统一长宽的图像
+    transform = SegDataset([], [], 'val', **config.dataset_config).transform_on_eval
+    imgs = torch.stack([transform(img)[0] for img in imgs], dim=0) # 统一转换为统一长宽的图像
     imgs.to(device)
 
     # 执行推理，并将推理结果恢复成原尺度图像
@@ -116,7 +118,12 @@ def run_and_refine_single_image(img_path:str, ckpt:str):
     for s, c in product(range(scale_count), range(config.num_classes)):
         final_img_with_class[c, :, :] += final_img[s, :, :] == c
     final_img = final_img_with_class.argmax(0) # type: np.ndarray
-    draw_output(img_path, final_img, y_pred_imgs[0])
+    # 绘制效果图
+    draw_output(img_path, {
+        'Predict Image': y_pred_imgs[0],
+        'Refined Image': final_img,
+        'Original Image': np.array(Image.open(img_path).convert('RGB'))
+    })
 
 def extract_info_from_filename(filename:str)->(int, int, int, str):
     '''从文件名中获取信息
@@ -161,25 +168,32 @@ def get_intersect_imgs(base_img:str)->list:
             filtered_files.append(os.path.join(base_path, filename))
     return filtered_files
 
-def draw_output(img_path:str, pred_img:np.ndarray, src_img:np.ndarray):
+def draw_output(img_path:str, imgs:dict):
     '''绘制原始图像和ground truth到一个文件中
 
     Args:
         img_path(str): 原始图像路径，用来获取标签路径
-        pred_img(np.ndarray): 预测数据
-        src_img(np.ndarray): 原始图片数据
+        imgs(dict<str: np.ndarray>): 输出的图片信息
     '''
+    assert 'Predict Image' in imgs, '必须包含预测图像'
     output_path = './output'
     if not os.path.exists(output_path):
         os.mkdir(output_path)
     gd_path = img_path.replace('img', 'label')
     gd_array = np.array(Image.open(gd_path))
+
+    # 将Ground Truth加入图像中
+    imgs['Ground Truth'] = gd_array
+
+    # 计算一个大致的准确率
+    pred_img = imgs['Predict Image']
     print('acc', np.sum(gd_array == pred_img) / gd_array.shape[0] / gd_array.shape[1])
 
-    fig = plt.figure(figsize=(15, 6))
-    plot_data = [(src_img, 'Source Image'), (pred_img, 'Predict Image'), (gd_array, 'Ground Truth')]
-    for i, (img, title) in enumerate(plot_data):
-        ax = fig.add_subplot(131 + i)
+    fig_w, fig_h = 15, int(6 * np.ceil(len(imgs) / 3)) # 宽度固定为15，高为6的整数倍
+    fig = plt.figure(figsize=(fig_w, fig_h))
+    # 绘制图像
+    for i, (title, img) in enumerate(imgs.items()):
+        ax = fig.add_subplot(31 + i + np.ceil(len(imgs) / 3) * 100)
         ax.set_title(title)
         if len(img.shape) == 2:
             ax.imshow(img / 3 * 255, cmap='bone')
@@ -187,9 +201,7 @@ def draw_output(img_path:str, pred_img:np.ndarray, src_img:np.ndarray):
             ax.imshow(img)
     output_filename = os.path.join(output_path, os.path.basename(img_path))
     miou, ious, mpa = get_metrics(gd_array, pred_img)
-
     fig.suptitle('$mIoU={:.2f}, mpa={:.2f}$\n$IoUs={}$'.format(miou, mpa, ious))
-
     fig.savefig(output_filename)
     print('Output has been saved to {}.'.format(output_filename))
 
@@ -197,11 +209,13 @@ def parse_args():
     parser = argparse.ArgumentParser(usage='python3 eval.py -i path/to/image -r path/to/checkpoint')
     parser.add_argument('-i', '--image', help='path to image')
     parser.add_argument('-r', '--checkpoint', help='path to the checkpoint')
+    parser.add_argument('-re', '--refine', default=1, help='switch on or not refinement')
     args = parser.parse_args()
     return args
 
 if __name__ == "__main__":
     args = parse_args()
-    # run_on_single_image(args.image, args.checkpoint)
-    # imgs =get_intersect_imgs(args.image)
-    run_and_refine_single_image(args.image, args.checkpoint)
+    if args.refine == 1:
+        run_and_refine_single_image(args.image, args.checkpoint)
+    else:
+        run_on_single_image(args.image, args.checkpoint)

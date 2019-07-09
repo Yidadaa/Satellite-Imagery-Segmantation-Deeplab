@@ -93,13 +93,12 @@ def train(model:nn.Module, dataloader:DataLoader, optimizer:Optimizer, ep:int, d
         
         # 计算运行时指标
         miou, _, mpa = get_metrics(y, y_)
-
         # 保存训练时数据
         train_info.append([ep, loss.item(), mpa, miou])
 
         # 输出信息
         if (step + 1) % config.train_config['log_interval'] == 0:
-            print('[Epoch %2d - %2d of %2d]mpa: %.2f, miou: %.2f, loss: %.2f'\
+            print('[Epoch %2d - %3d of %3d]mpa: %.2f, miou: %.2f, loss: %.2f'\
                 % (ep, step + 1, len(dataloader), mpa, miou, loss.item()))
     return train_info
 
@@ -162,7 +161,7 @@ def setup_dataloader(train_path:str, val_path:str):
         data_list, label_list = [
             [os.path.join(path, file) for file in os.listdir(path)]
             for path in [img_path, label_path]]
-        dataset[name] = DataLoader(SegDataset(data_list, label_list, **config.dataset_config), **config.dataloader_config)
+        dataset[name] = DataLoader(SegDataset(data_list, label_list, name, **config.dataset_config), **config.dataloader_config)
     return dataset['train'], dataset['val']
 
 def parse_args():
