@@ -26,7 +26,7 @@ dataset_config = {
 
 # 训练时参数
 train_config = {
-    'max_epoch': 20,
+    'max_epoch': 30,
     'lr': 1e-4,
     'log_interval': 2
 }

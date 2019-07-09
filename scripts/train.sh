@@ -1,1 +1,1 @@
-python train.py -t ./data/image_1 -v ./data/val
+python train.py -t ./data/train -v ./data/val

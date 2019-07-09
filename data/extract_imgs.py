@@ -106,7 +106,7 @@ def extract_imgs(img_path:str, label_path:str, output_path:str):
     # 将图像完全加载到内存，耗时可能会很长，内存小的机器慎用
     print('Loading image to memory, it may take a few minutes.')
     src_img = load_to_memory(src_img)
-    label_img = load_to_memory(label_img) if label_img else None
+    label_img = load_to_memory(label_img) if label_img is not None else None
     crop_and_save(src_img, label_img, output_path, img_path)
 
 def crop_and_save(src_img:np.ndarray, label_img:np.ndarray, output_path:str, img_path:str,
@@ -142,7 +142,7 @@ def crop_and_save(src_img:np.ndarray, label_img:np.ndarray, output_path:str, img
         for (x, y) in tqdm(w_h_iter, desc='Scale[{}*{}]'.format(scale, scale), total=total):
             # 执行裁剪
             cropped_src_img = src_img[x:x + scale, y:y + scale, :] # 只抽取RGB通道
-            cropped_label_img = label_img[x:x + scale, y:y + scale, :] if label_img else None
+            cropped_label_img = label_img[x:x + scale, y:y + scale, :] if label_img is not None else None
             # 过滤掉空白区域
             if not is_img_empty(cropped_src_img, 0.95):
                 img_count += 1
@@ -154,7 +154,7 @@ def crop_and_save(src_img:np.ndarray, label_img:np.ndarray, output_path:str, img
                 filename = '{}-{}-{}-{}.png'.format(scale, x, y, img_file_name)
                 # 只需写入RGB值
                 cv2.imwrite(os.path.join(src_output_path, filename), cropped_src_img[:, :, 0:3])
-                if cropped_label_img:
+                if cropped_label_img is not None:
                     cv2.imwrite(os.path.join(label_output_path, filename), cropped_label_img)
         if need_std_mean:
             # 计算数据集的均值和方差

@@ -31,8 +31,7 @@ def run_on_single_image(img_path:str, ckpt:str):
         assert path and os.path.exists(path), '%s不存在: %s' % (tip, path)
 
     print('Setting up model.')
-    model = DeepLabV3Res101()
-    model, device = setup(model)
+    model, device = setup(DeepLabV3Res101())
     print('Loading model from {}.'.format(ckpt))
     model, _ = restore_from(model, ckpt)
     model.eval()
@@ -54,7 +53,8 @@ def run_on_single_image(img_path:str, ckpt:str):
         'Source Image': np.array(src_img)
     })
 
-def run_and_refine_single_image(img_path:str, ckpt:str, show_output:bool = True)->np.ndarray:
+def run_and_refine_single_image(img_path:str, ckpt:str, show_output:bool = True,
+        model:nn.Module = None, device:int = None)->np.ndarray:
     '''对一张大图进行处理并进行多尺度融合
 
     Args:
@@ -67,12 +67,12 @@ def run_and_refine_single_image(img_path:str, ckpt:str, show_output:bool = True)
 
     for (path, tip) in zip([img_path, ckpt], ['图片', '检查点']):
         assert path and os.path.exists(path), '%s路径不存在: %s' % (tip, path)
-    print_('Setting up model.')
-    model = DeepLabV3Res101()
-    model, device = setup(model)
-    print_('Loading model from {}.'.format(ckpt))
-    model, _ = restore_from(model, ckpt)
-    model.eval()
+    if model is None and device is None:
+        print_('Setting up model.')
+        model, device = setup(DeepLabV3Res101())
+        print_('Loading model from {}.'.format(ckpt))
+        model, _ = restore_from(model, ckpt)
+        model.eval()
 
     # 获取所有相关图片，读取为PIL对象
     print_('Reading images.')
@@ -220,9 +220,21 @@ def draw_output(img_path:str, imgs:dict):
 
 def run_on_large_image(root_path:str, original_img:str, ckpt:str):
     '''在一整张图上执行运算
+
+    Args:
+        root_path(str): 从大图中提取的小图所在目录
+        original_img(str): 大图的路径
+        ckpt(str): 检查点路径
     '''
     assert os.path.exists(root_path), '路径不存在: {}'.format(root_path)
     assert os.path.exists(original_img), '路径不存在: {}'.format(original_img)
+    # 配置模型
+    print('Setting up model.')
+    model, device = setup(DeepLabV3Res101())
+    print('Loading model from {}.'.format(ckpt))
+    model, _ = restore_from(model, ckpt)
+    model.eval()
+
     file_list = os.listdir(root_path)
     original_img_array = vipImage.new_from_file(original_img)
     ow, oh = [getattr(original_img_array, key) for key in ['width', 'height']]
@@ -237,12 +249,13 @@ def run_on_large_image(root_path:str, original_img:str, ckpt:str):
     for file in tqdm(file_list, desc='Processing'):
         scale, x, y, _ = extract_info_from_filename(file)
         if scale != max_scale: continue
-        refined_image = run_and_refine_single_image(os.path.join(root_path, file), ckpt, False)
+        file_path = os.path.join(root_path, file)
+        refined_image = run_and_refine_single_image(file_path, ckpt, False, model=model, device=device)
         rh, rw = refined_image.shape # 根据生成图像大小填充最终图像
         large_array[x:x + rh, y:y + rw] = refined_image
     print(large_array.shape)
     output_file = os.path.join('./', os.path.basename(original_img))
-    Image.fromarray(large_array).save(output_file)
+    vipImage.new_from_array(large_array).save(output_file) # 使用PIL会报错
     print('Large Image File has been saved to {}'.format(output_file))
 
 def parse_args():
