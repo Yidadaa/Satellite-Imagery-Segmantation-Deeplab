@@ -41,7 +41,9 @@ class SegDataset(Dataset):
 
     def transformX(self, img:Image.Image)->torch.Tensor:
         img = img.resize((config.im_w, config.im_h), resample=Image.BILINEAR)
+        params = self.get_random_color_jitter_params()
         return transforms.Compose([
+            transforms.ColorJitter(**params),
             transforms.ToTensor(),
             transforms.Normalize(mean=self.mean, std=self.std)
         ])(img)
@@ -49,3 +51,11 @@ class SegDataset(Dataset):
     def transformY(self, label:Image.Image)->Image.Image:
         label = label.resize((config.im_w, config.im_h), resample=Image.NEAREST) # type: Image.Image
         return torch.Tensor(np.array(label, dtype=np.uint8)).long()
+
+    def get_random_color_jitter_params(self)->dict:
+        '''随机生成ColorJitter函数的参数
+        '''
+        params = {}
+        for key in ['brightness', 'contrast', 'saturation', 'hue']:
+            params[key] = np.random.rand() * 0.1
+        return params

@@ -79,7 +79,7 @@ def train(model:nn.Module, dataloader:DataLoader, optimizer:Optimizer, ep:int, d
     print('Size of training set: {}'.format(len(dataloader.dataset)))
 
     # 执行训练
-    for step, (X, y, size) in enumerate(dataloader):
+    for step, (X, y, _) in enumerate(dataloader):
         X = X.to(device) # type: torch.Tensor
         y = y.to(device) # type: torch.Tensor
         optimizer.zero_grad()

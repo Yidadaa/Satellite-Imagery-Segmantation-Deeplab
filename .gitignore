@@ -2,4 +2,4 @@ __pycache__
 
 checkpoints/*.pth
 
-info.json
+*.json
