@@ -128,11 +128,11 @@ def crop_and_save(src_img:np.ndarray, label_img:np.ndarray, output_path:str, img
    
     for scale in scales:
         # 这里会根据实际图像大小进行裁剪
-        [w, h] = src_img.shape[0:2]
+        [h, w] = src_img.shape[0:2]
         # 使用两个迭代器完成裁切工作
         width_iter = build_iter(w, scale)
         height_iter = build_iter(h, scale)
-        w_h_iter = product(width_iter, height_iter) # product生成两个迭代器的笛卡尔积
+        w_h_iter = product(height_iter, width_iter) # product生成两个迭代器的笛卡尔积
         total = len(width_iter) * len(height_iter) # 裁剪后图像总数量
         imgs = []
         for (x, y) in tqdm(w_h_iter, desc='Scale[{}*{}]'.format(scale, scale), total=total):
