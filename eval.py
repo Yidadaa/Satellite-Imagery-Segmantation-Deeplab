@@ -78,7 +78,7 @@ def run_and_refine_single_image(img_path:str, ckpt:str, show_output:bool = True)
     print_('Reading images.')
     all_imgs = [img_path] + get_intersect_imgs(img_path) # 图片路径，用于恢复图片尺度信息，首位是原始图像
     imgs = [Image.open(path).convert('RGB') for path in all_imgs]
-    img_sizes = [img.size for img in imgs] # 保存size，用于将图片复原
+    img_sizes = [img.size for img in imgs] # 保存size，用于将图片复原，注意：size->(w, h)
 
     # 准备转换函数，并转换为tensor
     print_('Loading images to device.')
@@ -94,17 +94,23 @@ def run_and_refine_single_image(img_path:str, ckpt:str, show_output:bool = True)
         y_pred_imgs = [np.array(Image.fromarray(array).resize(size))
             for size, array in zip(img_sizes, y_pred_arrays)] # 恢复图像尺度
 
+    # 统计总共有多少尺度
+    scales = set()
+    for p in all_imgs:
+        bs, _, _, _ = extract_info_from_filename(p)
+        scales.add(bs)
     # 开始拼接，根据目标图像即img_path来确定拼接大小
-    scale_index = {size[0]: index for index, size in enumerate(set(img_sizes))} # scale:index映射表
-    scale_count = len(scale_index) # 确定有多少个不同的尺度
-    final_img = np.zeros((scale_count, ) + img_sizes[0]) # 根据原始图像建立容器，shape=(scale_count, w, h)
+    scale_index = {scale: index for index, scale in enumerate(scales)} # scale:index映射表
+    scale_count = len(scales) # 确定有多少个不同的尺度
+    fw, fh = img_sizes[0] # 在边界时原始图像大小可能不等于scale*scale，所以要以原始图像大小为准
+    final_img = np.zeros((scale_count, fh, fw)) # 根据原始图像建立容器，shape=(scale_count, h, w)
     base_img, (bs, bx, by, _) = img_path, extract_info_from_filename(img_path) # 获取基准图像的信息
     for src_img_path, y_pred_img in tqdm(zip(all_imgs, y_pred_imgs), desc='Refining'):
         if src_img_path == base_img:
             # 处理基准图像，bs表示base image scale
-            assert y_pred_img.shape == final_img.shape[1:],\
-                '图像尺寸不匹配：{}->{}'.format(y_pred_img.shape, final_img.shape[1:])
-            final_img[scale_index[bs], :, :] = y_pred_img
+            if y_pred_img.shape != final_img.shape[1:]:
+                print('图像尺寸不匹配：{}->{}'.format(y_pred_img.shape, final_img.shape[1:]))
+            final_img[scale_index[bs], :, :] = y_pred_img[0:fh, 0:fw]
         else:
             # 相关图像将进行坐标转换
             es, ex, ey, _ = extract_info_from_filename(src_img_path) # 读入图像尺度信息
@@ -137,7 +143,7 @@ def extract_info_from_filename(filename:str)->(int, int, int, str):
 
     Args:
         filename(str): 图像文件名
-    
+
     Return:
         scale(int): 图像大小
         x, y(int, int): 图像起点
@@ -151,7 +157,7 @@ def extract_info_from_filename(filename:str)->(int, int, int, str):
 def get_intersect_imgs(base_img:str)->list:
     '''提取与base_img相交的所有图片路径
 
-    Args: 
+    Args:
         base_img(str): 目标图像
 
     Return:
@@ -218,9 +224,9 @@ def run_on_large_image(root_path:str, original_img:str, ckpt:str):
     assert os.path.exists(root_path), '路径不存在: {}'.format(root_path)
     assert os.path.exists(original_img), '路径不存在: {}'.format(original_img)
     file_list = os.listdir(root_path)
-    original_img_array = vipImage.new_from_array(original_img)
+    original_img_array = vipImage.new_from_file(original_img)
     ow, oh = [getattr(original_img_array, key) for key in ['width', 'height']]
-    large_array = np.zeros((oh, ow))
+    large_array = np.zeros((oh, ow), dtype=np.uint8)
     # 统计尺度
     scales = set()
     for file in file_list:
@@ -232,20 +238,28 @@ def run_on_large_image(root_path:str, original_img:str, ckpt:str):
         scale, x, y, _ = extract_info_from_filename(file)
         if scale != max_scale: continue
         refined_image = run_and_refine_single_image(os.path.join(root_path, file), ckpt, False)
-        large_array[x:x + scale, y:y + scale] = refined_image
+        rh, rw = refined_image.shape # 根据生成图像大小填充最终图像
+        large_array[x:x + rh, y:y + rw] = refined_image
     print(large_array.shape)
+    output_file = os.path.join('./', os.path.basename(original_img))
+    Image.fromarray(large_array).save(output_file)
+    print('Large Image File has been saved to {}'.format(output_file))
 
 def parse_args():
     parser = argparse.ArgumentParser(usage='python3 eval.py -i path/to/image -r path/to/checkpoint')
     parser.add_argument('-i', '--image', help='path to image')
     parser.add_argument('-r', '--checkpoint', help='path to the checkpoint')
     parser.add_argument('-re', '--refine', default=1, help='switch on or not refinement')
+    parser.add_argument('-ro', '--root_path', help='root path of images')
+    parser.add_argument('-oi', '--original_img', help='source image')
     args = parser.parse_args()
     return args
 
 if __name__ == "__main__":
     args = parse_args()
-    if args.refine == 1:
+    if args.root_path:
+        run_on_large_image(args.root_path, args.original_img, args.checkpoint)
+    elif args.refine == 1:
         run_and_refine_single_image(args.image, args.checkpoint)
     else:
         run_on_single_image(args.image, args.checkpoint)
