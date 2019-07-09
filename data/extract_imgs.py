@@ -91,22 +91,26 @@ def extract_imgs(img_path:str, label_path:str, output_path:str):
     print('Loading source image from {}.'.format(img_path))
     src_img = vipImage.new_from_file(img_path)
     
-    print('Loading label image from {}.'.format(label_path))
-    label_img = vipImage.new_from_file(label_path)
+    label_img = None
+    if label_path is not None:
+        print('Loading label image from {}.'.format(label_path))
+        label_img = vipImage.new_from_file(label_path)
 
     # 输出图片基本信息
     for img in [('Source Image', src_img), ('Label Image', label_img)]:
         print('{} info:'.format(img[0]))
+        if img[1] is None: continue
         for key in ['width', 'height', 'bands']:
             print('\t{}: {}'.format(key, getattr(img[1], key)))
 
     # 将图像完全加载到内存，耗时可能会很长，内存小的机器慎用
     print('Loading image to memory, it may take a few minutes.')
     src_img = load_to_memory(src_img)
-    label_img = load_to_memory(label_img)
+    label_img = load_to_memory(label_img) if label_img else None
     crop_and_save(src_img, label_img, output_path, img_path)
 
-def crop_and_save(src_img:np.ndarray, label_img:np.ndarray, output_path:str, img_path:str):
+def crop_and_save(src_img:np.ndarray, label_img:np.ndarray, output_path:str, img_path:str,
+        need_std_mean:bool = False):
     '''裁剪图片并保存
     Args:
         src_img, label_img(np.ndarray): 原始图片数组和标签数组
@@ -138,7 +142,7 @@ def crop_and_save(src_img:np.ndarray, label_img:np.ndarray, output_path:str, img
         for (x, y) in tqdm(w_h_iter, desc='Scale[{}*{}]'.format(scale, scale), total=total):
             # 执行裁剪
             cropped_src_img = src_img[x:x + scale, y:y + scale, :] # 只抽取RGB通道
-            cropped_label_img = label_img[x:x + scale, y:y + scale, :]
+            cropped_label_img = label_img[x:x + scale, y:y + scale, :] if label_img else None
             # 过滤掉空白区域
             if not is_img_empty(cropped_src_img, 0.95):
                 img_count += 1
@@ -150,14 +154,15 @@ def crop_and_save(src_img:np.ndarray, label_img:np.ndarray, output_path:str, img
                 filename = '{}-{}-{}-{}.png'.format(scale, x, y, img_file_name)
                 # 只需写入RGB值
                 cv2.imwrite(os.path.join(src_output_path, filename), cropped_src_img[:, :, 0:3])
-                cv2.imwrite(os.path.join(label_output_path, filename), cropped_label_img)
-        # 计算数据集的均值和方差
-        print('Concating images.')
-        imgs = np.concatenate(imgs)
-        mean = list(np.mean(imgs, axis=0))
-        std = list(np.std(imgs, axis=0))
-        print('Mean: {}, Std: {}'.format(mean, std))
-
+                if cropped_label_img:
+                    cv2.imwrite(os.path.join(label_output_path, filename), cropped_label_img)
+        if need_std_mean:
+            # 计算数据集的均值和方差
+            print('Concating images.')
+            imgs = np.concatenate(imgs)
+            mean = list(np.mean(imgs, axis=0))
+            std = list(np.std(imgs, axis=0))
+            print('Mean: {}, Std: {}'.format(mean, std))
     print('Extracted {} images from {}'.format(img_count, img_path))
 
 def parse_args():
@@ -172,7 +177,8 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
     assert os.path.exists(args.img), '请指定有效的图片路径'
-    assert os.path.exists(args.label), '请指定有效的标签图片路径'
+    if args.label:
+        assert os.path.exists(args.label), '请指定有效的标签图片路径'
     assert args.output is not None, '请指定有效果的输出路径'
     create_folders(args.output)
     extract_imgs(args.img, args.label, args.output)
