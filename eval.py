@@ -20,7 +20,7 @@ from utils import setup, restore_from, get_metrics
 from dataloader import SegDataset
 import config
 
-def run_on_single_image(img_path:str, ckpt:str):
+def run_on_single_image(img_path:str, ckpt:str, model:nn.Module = None, device:int = None)->np.ndarray:
     '''对单张图片进行处理
 
     Args:
@@ -30,11 +30,10 @@ def run_on_single_image(img_path:str, ckpt:str):
     for (path, tip) in zip([img_path, ckpt], ['图片', '检查点']):
         assert path and os.path.exists(path), '%s不存在: %s' % (tip, path)
 
-    print('Setting up model.')
-    model, device = setup(DeepLabV3Res101())
-    print('Loading model from {}.'.format(ckpt))
-    model, _ = restore_from(model, ckpt)
-    model.eval()
+    if model is None and device is None:
+        model, device = setup(DeepLabV3Res101())
+        model, _ = restore_from(model, ckpt)
+        model.eval()
 
     # 读取并转换图片
     src_img = Image.open(img_path).convert('RGB')
@@ -52,6 +51,7 @@ def run_on_single_image(img_path:str, ckpt:str):
         'Predict Image': y_pred_img,
         'Source Image': np.array(src_img)
     })
+    return y_pred_img
 
 def run_and_refine_single_image(img_path:str, ckpt:str, show_output:bool = True,
         model:nn.Module = None, device:int = None)->np.ndarray:
@@ -193,14 +193,14 @@ def draw_output(img_path:str, imgs:dict):
     if not os.path.exists(output_path):
         os.mkdir(output_path)
     gd_path = img_path.replace('img', 'label')
-    gd_array = np.array(Image.open(gd_path))
+    gd_array = np.array(Image.open(gd_path)) if os.path.exists(gd_path) else None
 
     # 将Ground Truth加入图像中
-    imgs['Ground Truth'] = gd_array
-
-    # 计算一个大致的准确率
-    pred_img = imgs['Predict Image']
-    print('acc', np.sum(gd_array == pred_img) / gd_array.shape[0] / gd_array.shape[1])
+    if gd_array is not None:
+        imgs['Ground Truth'] = gd_array
+        # 计算一个大致的准确率
+        pred_img = imgs['Predict Image']
+        print('acc', np.sum(gd_array == pred_img) / gd_array.shape[0] / gd_array.shape[1])
 
     fig_w, fig_h = 15, int(6 * np.ceil(len(imgs) / 3)) # 宽度固定为15，高为6的整数倍
     fig = plt.figure(figsize=(fig_w, fig_h))
@@ -213,8 +213,9 @@ def draw_output(img_path:str, imgs:dict):
         else:
             ax.imshow(img)
     output_filename = os.path.join(output_path, os.path.basename(img_path))
-    miou, ious, mpa = get_metrics(gd_array, pred_img)
-    fig.suptitle('$mIoU={:.2f}, mpa={:.2f}$\n$IoUs={}$'.format(miou, mpa, ious))
+    if gd_array is not None:
+        miou, ious, mpa = get_metrics(gd_array, pred_img)
+        fig.suptitle('$mIoU={:.2f}, mpa={:.2f}$\n$IoUs={}$'.format(miou, mpa, ious))
     fig.savefig(output_filename)
     print('Output has been saved to {}.'.format(output_filename))
 
@@ -250,12 +251,13 @@ def run_on_large_image(root_path:str, original_img:str, ckpt:str):
         scale, x, y, _ = extract_info_from_filename(file)
         if scale != max_scale: continue
         file_path = os.path.join(root_path, file)
-        refined_image = run_and_refine_single_image(file_path, ckpt, False, model=model, device=device)
+        # refined_image = run_and_refine_single_image(file_path, ckpt, False, model=model, device=device)
+        refined_image = run_on_single_image(file_path, ckpt, model=model, device=device)
         rh, rw = refined_image.shape # 根据生成图像大小填充最终图像
         large_array[x:x + rh, y:y + rw] = refined_image
-    print(large_array.shape)
+    print(large_array.shape, large_array.sum())
     output_file = os.path.join('./', os.path.basename(original_img))
-    vipImage.new_from_array(large_array).save(output_file) # 使用PIL会报错
+    vipImage.new_from_memory(large_array.data, ow, oh, 1, 'uchar').write_to_file(output_file) # 使用PIL会报错
     print('Large Image File has been saved to {}'.format(output_file))
 
 def parse_args():
