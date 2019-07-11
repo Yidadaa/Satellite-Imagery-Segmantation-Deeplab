@@ -7,6 +7,7 @@ from torch.optim import Optimizer, Adam
 from torch.utils.data import DataLoader
 from torch.nn import functional as F
 from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 import numpy as np
 import argparse
@@ -143,31 +144,29 @@ def validate(model:nn.Module, test_dataloader:DataLoader, optimizer:Optimizer, e
 
     return test_info
 
-def setup_dataloader(train_path:str, val_path:str):
+def setup_dataloader(train_path:str):
     '''构建训练用数据集，包含训练集和测试集
 
     Args:
         train_path(str): 训练数据集路径
-        val_path(str): 验证数据集路径
     
     Return:
         train_loader(Dataloader): 训练集加载器
         val_loader(Dataloader): 验证集加载器
     '''
-    names = [('train', train_path), ('val', val_path)]
+    list_full_path = lambda path: [os.path.join(path, f) for f in os.listdir(path)]
+    split_size = 0.2 # 选取0.2作为验证集
+    X_list = list_full_path(os.path.join(train_path, 'img'))
+    y_list = list_full_path(os.path.join(train_path, 'label'))
+    X_train, X_val, y_train, y_val = train_test_split(X_list, y_list, test_size=split_size)
     dataset = {}
-    for (name, root_path) in names:
-        img_path, label_path = [os.path.join(root_path, key) for key in ['img', 'label']]
-        data_list, label_list = [
-            [os.path.join(path, file) for file in os.listdir(path)]
-            for path in [img_path, label_path]]
+    for name, data_list, label_list in [('train', X_train, y_train), ('val', X_val, y_val)]:
         dataset[name] = DataLoader(SegDataset(data_list, label_list, name, **config.dataset_config), **config.dataloader_config)
     return dataset['train'], dataset['val']
 
 def parse_args():
     parser = argparse.ArgumentParser(usage='python3 train.py -t path/to/train/data -v path/to/val/data -r path/to/checkpoint')
     parser.add_argument('-t', '--train_path', help='path to your datasets', default='./data/train')
-    parser.add_argument('-v', '--val_path', help='path to your datasets', default='./data/val')
     parser.add_argument('-r', '--restore_from', help='path to the checkpoint', default=None)
     args = parser.parse_args()
     return args
@@ -176,7 +175,6 @@ if __name__ == "__main__":
     names = ['train', 'val']
     args = parse_args()
     assert os.path.exists(args.train_path), '请指定训练数据集路径'
-    assert os.path.exists(args.val_path), '请指定测试数据集路径'
     print('Setting up dataloaders.')
-    train_loader, val_loader = setup_dataloader(args.train_path, args.val_path)
+    train_loader, val_loader = setup_dataloader(args.train_path)
     train_on_epochs(train_loader, val_loader, args.restore_from)
