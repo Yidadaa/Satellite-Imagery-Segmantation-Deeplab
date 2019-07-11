@@ -46,11 +46,11 @@ def run_on_single_image(img_path:str, ckpt:str, model:nn.Module = None, device:i
         y_pred = y_pred.argmax(dim=1).cpu().numpy()[0] # type: np.ndarray
         y_pred_img = np.array(Image.fromarray(y_pred.astype(np.uint8)).resize(src_img.size))
 
-    # 绘制结果图
-    draw_output(img_path, {
-        'Predict Image': y_pred_img,
-        'Source Image': np.array(src_img)
-    })
+    # # 绘制结果图
+    # draw_output(img_path, {
+    #     'Predict Image': y_pred_img,
+    #     'Source Image': np.array(src_img)
+    # })
     return y_pred_img
 
 def run_and_refine_single_image(img_path:str, ckpt:str, show_output:bool = True,
@@ -134,7 +134,7 @@ def run_and_refine_single_image(img_path:str, ckpt:str, show_output:bool = True,
         'Predict Image': y_pred_imgs[0],
         'Refined Image': final_img,
         'Original Image': np.array(Image.open(img_path).convert('RGB'))
-    })
+    }, show_output=show_output)
     # 返回refine过的图像
     return final_img
 
@@ -181,7 +181,7 @@ def get_intersect_imgs(base_img:str)->list:
             filtered_files.append(os.path.join(base_path, filename))
     return filtered_files
 
-def draw_output(img_path:str, imgs:dict):
+def draw_output(img_path:str, imgs:dict, show_output:bool = True):
     '''绘制原始图像和ground truth到一个文件中
 
     Args:
@@ -217,12 +217,20 @@ def draw_output(img_path:str, imgs:dict):
             ax.imshow(img / 3 * 255, cmap='bone')
         else:
             ax.imshow(img)
-    output_filename = os.path.join(output_path, os.path.basename(img_path))
+    # 计算各项指标
     if gd_array is not None:
         miou, ious, acc = get_metrics(gd_array, pred_img)
         fig.suptitle('$mIoU={:.2f}, acc={:.2f}$\n$IoUs={}$'.format(miou, acc, ['%.2f' % x for x in ious]))
+    # 获取原始文件名，并根据文件名得到输出目录信息
+    filename = os.path.basename(img_path)
+    _, _, _, parent_img = extract_info_from_filename(filename)
+    output_path = os.path.join(output_path, parent_img.replace('.png', '')) # 按父文件名分类
+    output_filename = os.path.join(output_path, filename)
+    if not os.path.exists(output_path):
+        os.mkdir(output_path)
     fig.savefig(output_filename)
-    print('Output has been saved to {}.'.format(output_filename))
+    if show_output:
+        print('Output has been saved to {}.'.format(output_filename))
 
 def run_on_large_image(root_path:str, original_img:str, ckpt:str):
     '''在一整张图上执行运算
@@ -251,7 +259,8 @@ def run_on_large_image(root_path:str, original_img:str, ckpt:str):
         scale, _, _, _ = extract_info_from_filename(file)
         scales.add(scale)
     # 使用最大尺度的图片作为索引
-    max_scale = max(scales)
+    # max_scale = max(scales)
+    max_scale = 600 # 使用600作为索引
     for file in tqdm(file_list, desc='Processing'):
         scale, x, y, _ = extract_info_from_filename(file)
         if scale != max_scale: continue
@@ -260,10 +269,16 @@ def run_on_large_image(root_path:str, original_img:str, ckpt:str):
         refined_image = run_on_single_image(file_path, ckpt, model=model, device=device)
         rh, rw = refined_image.shape # 根据生成图像大小填充最终图像
         large_array[x:x + rh, y:y + rw] = refined_image
-    print(large_array.shape, large_array.sum())
-    output_file = os.path.join('./', os.path.basename(original_img))
-    vipImage.new_from_memory(large_array.data, ow, oh, 1, 'uchar').write_to_file(output_file) # 使用PIL会报错
-    print('Large Image File has been saved to {}'.format(output_file))
+    print('Saving to files...')
+    # 为输出图片上色，方便查看
+    colored_array = large_array * 85
+    # 输出目录
+    filename, extension = os.path.basename(original_img).rsplit('.', 1)
+    output_file = os.path.join('./output', '{}_prediction.{}'.format(filename, extension))
+    colored_file = os.path.join('./output', '{}_prediction_colored.{}'.format(filename, extension))
+    vipImage.new_from_memory(large_array.data, ow, oh, 1, 'uchar').write_to_file(output_file)
+    vipImage.new_from_memory(colored_array.data, ow, oh, 1, 'uchar').write_to_file(colored_file)
+    print('Large Image File has been saved to {} and {}'.format(output_file, colored_file))
 
 def parse_args():
     parser = argparse.ArgumentParser(usage='python3 eval.py -i path/to/image -r path/to/checkpoint')
