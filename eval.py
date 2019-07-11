@@ -198,9 +198,14 @@ def draw_output(img_path:str, imgs:dict):
     # 将Ground Truth加入图像中
     if gd_array is not None:
         imgs['Ground Truth'] = gd_array
-        # 计算一个大致的准确率
         pred_img = imgs['Predict Image']
-        print('acc', np.sum(gd_array == pred_img) / gd_array.shape[0] / gd_array.shape[1])
+
+    # 绘制图例
+    legend_array = np.zeros((100, 800), dtype=np.uint8)
+    for i in range(config.num_classes):
+        legend_array[:, i * 200:(i + 1) * 200] = i
+    legend_array = legend_array / (config.num_classes - 1) * 255
+    imgs['Legend'] = legend_array
 
     fig_w, fig_h = 15, int(6 * np.ceil(len(imgs) / 3)) # 宽度固定为15，高为6的整数倍
     fig = plt.figure(figsize=(fig_w, fig_h))
@@ -214,8 +219,8 @@ def draw_output(img_path:str, imgs:dict):
             ax.imshow(img)
     output_filename = os.path.join(output_path, os.path.basename(img_path))
     if gd_array is not None:
-        miou, ious, mpa = get_metrics(gd_array, pred_img)
-        fig.suptitle('$mIoU={:.2f}, mpa={:.2f}$\n$IoUs={}$'.format(miou, mpa, ious))
+        miou, ious, acc = get_metrics(gd_array, pred_img)
+        fig.suptitle('$mIoU={:.2f}, acc={:.2f}$\n$IoUs={}$'.format(miou, acc, ['%.2f' % x for x in ious]))
     fig.savefig(output_filename)
     print('Output has been saved to {}.'.format(output_filename))
 

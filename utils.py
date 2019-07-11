@@ -95,15 +95,14 @@ def get_metrics(gd_array:np.ndarray, pred_array:np.ndarray)->(float, list, float
     '''
     num_classes = 4
     IoUs = []
-    pa = 0
     assert pred_array.shape == gd_array.shape, '预测图片({})和GD({})大小不一致'.format(pred_array.shape, gd_array.shape)
     for c in range(1, num_classes):
-        TP = np.sum(pred_array[gd_array == c] == c) # 预测和GD都为c的值
-        FP = np.sum(pred_array[gd_array == c] != c) # 预测不为c，GD为c
-        FN = np.sum(pred_array[gd_array != c] != c) # 预测不为c，GD也不为c
-        IoU = TP / sum([TP, FP, FN])
+        gmask = gd_array == c
+        pmask = pred_array == c
+        iarea = np.sum(gmask & pmask)
+        uarea = np.sum(gmask | pmask)
+        IoU = iarea / uarea
         IoUs.append(IoU)
-        pa += TP / pred_array.size
-    mIoU = sum(IoUs) / (num_classes - 1)
-    mpa = pa / (num_classes - 1)
-    return mIoU, IoUs, mpa
+    mIoU = np.nanmean(IoUs)
+    acc = np.sum(gd_array == pred_array) / pred_array.size
+    return mIoU, IoUs, acc
