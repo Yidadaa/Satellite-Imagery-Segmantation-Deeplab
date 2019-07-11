@@ -3,15 +3,15 @@
 '''
 
 # 训练时图像大小
-im_w = 480
-im_h = 480
+im_w = 224
+im_h = 224
 
 # 类别
 num_classes = 4
 
 # dataloader参数
 dataloader_config = {
-    'batch_size': 48,
+    'batch_size': 96,
     'shuffle': True,
     'num_workers': 4,
     'pin_memory': True,

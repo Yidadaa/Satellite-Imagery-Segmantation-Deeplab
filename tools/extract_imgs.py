@@ -124,7 +124,7 @@ def crop_and_save(src_img:np.ndarray, label_img:np.ndarray, output_path:str, img
     label_output_path = os.path.join(output_path, 'label')
 
     # 开始裁剪图片
-    scales = [480, 600, 960, 1280] # 多尺度裁切
+    scales = [256, 320, 480] # 多尺度裁切
     build_iter = lambda n, s: range(0, (n // s + 1) * s, s) # 范围覆盖(0, n)且步长为s的迭代器
 
     # 统计图像总数目
