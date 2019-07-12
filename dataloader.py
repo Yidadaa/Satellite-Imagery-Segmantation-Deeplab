@@ -11,14 +11,23 @@ import numpy as np
 import config
 
 class SegDataset(Dataset):
-    def __init__(self, data_paths:list, label_paths:list, name:str, mean:list, std:list):
+    def __init__(self, data_paths:list, label_paths:list, name:str, mean:list, std:list,
+            use_jitter:bool = False):
         '''自定义数据集
+
+        Args:
+            data_paths(str): 图像路径列表
+            label_paths(str): 标签路径列表
+            name(str): 数据集名字
+            mean, str(list): 均值和方差
+            use_jitter(bool): 是否使用jitter数据增强，默认False
         '''
         self.data_paths = data_paths
         self.label_paths = label_paths
         self.name = name
         self.mean = mean
         self.std = std
+        self.use_jitter = use_jitter
 
     def __len__(self):
         return len(self.data_paths)
@@ -60,13 +69,14 @@ class SegDataset(Dataset):
             if np.random.rand() < 0.5: continue
             img = img.transpose(flag)
             label = label.transpose(flag)
-
-        params = self.get_random_color_jitter_params() # 随机调整亮度、对比度、色调等数值
-        return transforms.Compose([
-            transforms.ColorJitter(**params),
+        transform_funcs = [
             transforms.ToTensor(),
             transforms.Normalize(mean=self.mean, std=self.std)
-        ])(img), torch.Tensor(np.array(label, dtype=np.uint8)).long()
+        ]
+        if self.use_jitter:
+            params = self.get_random_color_jitter_params() # 随机调整亮度、对比度、色调等数值
+            transform_funcs.insert(0, transforms.ColorJitter(**params))
+        return transforms.Compose(transform_funcs)(img), torch.Tensor(np.array(label, dtype=np.uint8)).long()
 
     def transform_on_eval(self, img:Image.Image, label:Image.Image = None)->(torch.Tensor, torch.Tensor):
         img = img.resize((config.im_w, config.im_h), resample=Image.BILINEAR) # type: Image.Image

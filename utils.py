@@ -54,6 +54,8 @@ def save_to(model:nn.Module, path:str, ep:int):
         path(str): 存档路径
         ep(int): 当前所处的epoch
     '''
+    if not os.path.exists(path):
+        os.mkdir(path)
     ckpt_path = os.path.join(path, 'ep-%d.pth' % ep)
     torch.save({
         'epoch': ep,
