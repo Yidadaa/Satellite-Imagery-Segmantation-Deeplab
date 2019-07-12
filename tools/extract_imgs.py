@@ -124,7 +124,7 @@ def crop_and_save(src_img:np.ndarray, label_img:np.ndarray, output_path:str, img
     label_output_path = os.path.join(output_path, 'label')
 
     # 开始裁剪图片
-    scales = [256, 320, 480] # 多尺度裁切
+    scales = [256, 480] # 多尺度裁切
     build_iter = lambda n, s: range(0, (n // s + 1) * s, s) # 范围覆盖(0, n)且步长为s的迭代器
 
     # 统计图像总数目
@@ -146,23 +146,12 @@ def crop_and_save(src_img:np.ndarray, label_img:np.ndarray, output_path:str, img
             # 过滤掉空白区域
             if not is_img_empty(cropped_src_img, 0.95):
                 img_count += 1
-                # 收集所有的像素值，用于计算均值和方差
-                w, h, c = cropped_src_img.shape
-                reshaped_crop = cropped_src_img.reshape((w * h, c))[:, 0:3]
-                imgs.append(reshaped_crop)
                 # 写入硬盘
                 filename = '{}-{}-{}-{}.png'.format(scale, x, y, img_file_name)
                 # 只需写入RGB值
                 cv2.imwrite(os.path.join(src_output_path, filename), cropped_src_img[:, :, 0:3])
                 if cropped_label_img is not None:
                     cv2.imwrite(os.path.join(label_output_path, filename), cropped_label_img)
-        if need_std_mean:
-            # 计算数据集的均值和方差
-            print('Concating images.')
-            imgs = np.concatenate(imgs)
-            mean = list(np.mean(imgs, axis=0))
-            std = list(np.std(imgs, axis=0))
-            print('Mean: {}, Std: {}'.format(mean, std))
     print('Extracted {} images from {}'.format(img_count, img_path))
 
 def parse_args():

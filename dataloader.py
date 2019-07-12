@@ -11,7 +11,8 @@ import numpy as np
 import config
 
 class SegDataset(Dataset):
-    def __init__(self, data_paths:list, label_paths:list, name:str, mean:list, std:list,
+    def __init__(self, data_paths:list, label_paths:list, name:str,
+            mean:list = [0, 0, 0], std:list = [1, 1, 1],
             use_jitter:bool = False):
         '''自定义数据集
 

@@ -1,6 +1,6 @@
 __pycache__
 
-checkpoints/*.pth
+checkpoints
 
 *.json
 *.png

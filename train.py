@@ -25,18 +25,22 @@ import config
 
 class Trainer(object):
     def __init__(self, data_path:str, ckpt_path:str = None, model_name:str = 'deeplab',
-            loss_name:str = 'focal', log_dir:str = 'logs'):
+            loss_name:str = 'focal', log_dir:str = 'logs', lr:float = 1e-3,
+            weight:list = None):
         '''
         Args:
             data_path(str): 训练数据存放位置
             ckpt_path(str): 存档点文件存放位置
         '''
+        self.date_id = time.strftime("%Y-%m-%d_%H:%M:%S", time.localtime())
         self.model_name = model_name
         self.loss_name = loss_name
+        self.lr = lr
+        self.weight = torch.Tensor(weight) if weight is not None else weight
         self.train_loader, self.val_loader = self.setup_dataloader(data_path)
         self.model, self.device, self.start_ep = self.setup_model(model_name, ckpt_path)
         self.ckpt = ckpt_path
-        self.optimizer = Adam(self.model.parameters(), lr=config.train_config['lr'])
+        self.optimizer = Adam(self.model.parameters(), self.lr)
         self.criterion = self.setup_loss(loss_name)
         self.writer = SummaryWriter(self.get_log_dir(log_dir))
 
@@ -44,9 +48,9 @@ class Trainer(object):
         return os.path.join(log_dir, self.get_comment())
 
     def get_comment(self):
-        date_time = time.strftime("%Y-%m-%d_%H:%M:%S", time.localtime())
-        return '{}_{}_startfrom_{}_{}'.format(self.model_name, self.loss_name,
-            self.start_ep, date_time)
+        weight_flag = 'noweight' if self.weight is None else 'withweight'
+        return '{}_{}_startfrom_{}_{}_{}_{}'.format(self.model_name, self.loss_name,
+            self.start_ep, self.lr, weight_flag, self.date_id)
 
     def setup_loss(self, loss_name:str):
         '''配置loss函数
@@ -128,7 +132,7 @@ class Trainer(object):
             y = y.to(self.device) # type: torch.Tensor
             self.optimizer.zero_grad()
             y_ = self.model(X) # type: torch.Tensor
-            loss = self.criterion(y_, y) # type: torch.Tensor
+            loss = self.criterion(y_, y, weight=self.weight) # type: torch.Tensor
             loss.backward()
             self.optimizer.step()
 
