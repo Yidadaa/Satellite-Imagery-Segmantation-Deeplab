@@ -61,9 +61,9 @@ class SegDataset(Dataset):
             img = img.transpose(flag)
             label = label.transpose(flag)
 
-        # params = self.get_random_color_jitter_params() # 随机调整亮度、对比度、色调等数值
+        params = self.get_random_color_jitter_params() # 随机调整亮度、对比度、色调等数值
         return transforms.Compose([
-            # transforms.ColorJitter(**params),
+            transforms.ColorJitter(**params),
             transforms.ToTensor(),
             transforms.Normalize(mean=self.mean, std=self.std)
         ])(img), torch.Tensor(np.array(label, dtype=np.uint8)).long()

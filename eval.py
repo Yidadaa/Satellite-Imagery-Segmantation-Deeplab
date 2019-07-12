@@ -105,7 +105,7 @@ def run_and_refine_single_image(img_path:str, ckpt:str, show_output:bool = True,
     fw, fh = img_sizes[0] # 在边界时原始图像大小可能不等于scale*scale，所以要以原始图像大小为准
     final_img = np.zeros((scale_count, fh, fw)) # 根据原始图像建立容器，shape=(scale_count, h, w)
     base_img, (bs, bx, by, _) = img_path, extract_info_from_filename(img_path) # 获取基准图像的信息
-    for src_img_path, y_pred_img in tqdm(zip(all_imgs, y_pred_imgs), desc='Refining'):
+    for src_img_path, y_pred_img in zip(all_imgs, y_pred_imgs):
         if src_img_path == base_img:
             # 处理基准图像，bs表示base image scale
             if y_pred_img.shape != final_img.shape[1:]:
@@ -130,11 +130,11 @@ def run_and_refine_single_image(img_path:str, ckpt:str, show_output:bool = True,
         final_img_with_class[c, :, :] += final_img[s, :, :] == c
     final_img = final_img_with_class.argmax(0) # type: np.ndarray
     # 绘制效果图
-    draw_output(img_path, {
-        'Predict Image': y_pred_imgs[0],
-        'Refined Image': final_img,
-        'Original Image': np.array(Image.open(img_path).convert('RGB'))
-    }, show_output=show_output)
+    # draw_output(img_path, {
+    #     'Predict Image': y_pred_imgs[0],
+    #     'Refined Image': final_img,
+    #     'Original Image': np.array(Image.open(img_path).convert('RGB'))
+    # }, show_output=show_output)
     # 返回refine过的图像
     return final_img
 
@@ -232,7 +232,7 @@ def draw_output(img_path:str, imgs:dict, show_output:bool = True):
     if show_output:
         print('Output has been saved to {}.'.format(output_filename))
 
-def run_on_large_image(root_path:str, original_img:str, ckpt:str):
+def run_on_large_image(root_path:str, original_img:str, ckpt:str, refine:bool):
     '''在一整张图上执行运算
 
     Args:
@@ -259,23 +259,25 @@ def run_on_large_image(root_path:str, original_img:str, ckpt:str):
         scale, _, _, _ = extract_info_from_filename(file)
         scales.add(scale)
     # 使用最大尺度的图片作为索引
-    # max_scale = max(scales)
-    max_scale = 600 # 使用600作为索引
-    for file in tqdm(file_list, desc='Processing'):
+    max_scale = max(scales) if refine else min(scales)
+    for file in tqdm(file_list, desc='Processing[r={}]'.format(refine)):
         scale, x, y, _ = extract_info_from_filename(file)
         if scale != max_scale: continue
         file_path = os.path.join(root_path, file)
-        # refined_image = run_and_refine_single_image(file_path, ckpt, False, model=model, device=device)
-        refined_image = run_on_single_image(file_path, ckpt, model=model, device=device)
+        if refine:
+            refined_image = run_and_refine_single_image(file_path, ckpt, False, model=model, device=device)
+        else:
+            refined_image = run_on_single_image(file_path, ckpt, model=model, device=device)
         rh, rw = refined_image.shape # 根据生成图像大小填充最终图像
         large_array[x:x + rh, y:y + rw] = refined_image
     print('Saving to files...')
     # 为输出图片上色，方便查看
     colored_array = large_array * 85
     # 输出目录
+    flag = 'refined' if refine else 'norefine'
     filename, extension = os.path.basename(original_img).rsplit('.', 1)
-    output_file = os.path.join('./output', '{}_prediction.{}'.format(filename, extension))
-    colored_file = os.path.join('./output', '{}_prediction_colored.{}'.format(filename, extension))
+    output_file = os.path.join('./output', '{}_predict_{}_{}.{}'.format(filename, max_scale, flag, extension))
+    colored_file = os.path.join('./output', '{}_predict_colored_{}_{}.{}'.format(filename, max_scale, flag, extension))
     vipImage.new_from_memory(large_array.data, ow, oh, 1, 'uchar').write_to_file(output_file)
     vipImage.new_from_memory(colored_array.data, ow, oh, 1, 'uchar').write_to_file(colored_file)
     print('Large Image File has been saved to {} and {}'.format(output_file, colored_file))
@@ -284,7 +286,7 @@ def parse_args():
     parser = argparse.ArgumentParser(usage='python3 eval.py -i path/to/image -r path/to/checkpoint')
     parser.add_argument('-i', '--image', help='path to image')
     parser.add_argument('-r', '--checkpoint', help='path to the checkpoint')
-    parser.add_argument('-re', '--refine', default=1, help='switch on or not refinement')
+    parser.add_argument('-re', '--refine', default=0, help='switch on or not refinement')
     parser.add_argument('-ro', '--root_path', help='root path of images')
     parser.add_argument('-oi', '--original_img', help='source image')
     args = parser.parse_args()
@@ -293,8 +295,6 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
     if args.root_path:
-        run_on_large_image(args.root_path, args.original_img, args.checkpoint)
-    elif args.refine == 1:
-        run_and_refine_single_image(args.image, args.checkpoint)
+        run_on_large_image(args.root_path, args.original_img, args.checkpoint, args.refine)
     else:
-        run_on_single_image(args.image, args.checkpoint)
+        run_and_refine_single_image(args.image, args.checkpoint, args.refine)

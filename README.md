@@ -33,4 +33,9 @@ pip install opencv-python
 1. pvvips读入的图片是`RGB`还是`BGR`排列？
 
 ## TODO
-- [] `metrics`函数
+- [x] `metrics`函数
+
+## 分数
+1. [0.20] refined, 1280, scales = [480, 600, 960, 1280]
+2. [0.22] no refine, 1280, scales = [480, 600, 960, 1280]
+3. [0.22] no refine, 480, scales = [224, 320, 480]

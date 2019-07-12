@@ -4,6 +4,7 @@
 from torchvision import models
 import torch
 from torch import nn, Tensor
+import torch.nn.functional as F
 
 import config
 

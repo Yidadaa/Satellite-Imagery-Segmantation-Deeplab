@@ -18,6 +18,7 @@ import json
 from dataloader import SegDataset
 from model import DeepLabV3Res101
 from utils import setup, restore_from, save_to, get_metrics
+from losses import FocalLoss2d
 import config
 
 def train_on_epochs(train_loader:DataLoader, val_loader:DataLoader, ckpt:str=None):
@@ -46,10 +47,13 @@ def train_on_epochs(train_loader:DataLoader, val_loader:DataLoader, ckpt:str=Non
     # 设定优化器
     optimizer = Adam(model.parameters(), lr=config.train_config['lr'])
 
+    # 设定Loss
+    criterion = FocalLoss2d().to(device)
+
     # 开始执行训练
     for ep in range(start_ep, config.train_config['max_epoch']):
-        train_info = train(model, train_loader, optimizer, ep, device)
-        val_info = validate(model, val_loader, optimizer, ep, device)
+        train_info = train(model, train_loader, optimizer, ep, device, criterion)
+        val_info = validate(model, val_loader, optimizer, ep, device, criterion)
         # 保存信息
         info['train'] += train_info
         info['val'] += val_info
@@ -61,7 +65,8 @@ def train_on_epochs(train_loader:DataLoader, val_loader:DataLoader, ckpt:str=Non
     
     print('Done.')
 
-def train(model:nn.Module, dataloader:DataLoader, optimizer:Optimizer, ep:int, device:torch.device):
+def train(model:nn.Module, dataloader:DataLoader, optimizer:Optimizer, ep:int,
+        device:int, criterion:nn.Module):
     '''训练模型
 
     Args:
@@ -85,7 +90,7 @@ def train(model:nn.Module, dataloader:DataLoader, optimizer:Optimizer, ep:int, d
         y = y.to(device) # type: torch.Tensor
         optimizer.zero_grad()
         y_ = model(X) # type: torch.Tensor
-        loss = F.cross_entropy(y_, y) # type: torch.Tensor
+        loss = criterion(y_, y) # type: torch.Tensor
         loss.backward()
         optimizer.step()
 
@@ -103,7 +108,8 @@ def train(model:nn.Module, dataloader:DataLoader, optimizer:Optimizer, ep:int, d
                 % (ep, step + 1, len(dataloader), mpa, miou, loss.item()))
     return train_info
 
-def validate(model:nn.Module, test_dataloader:DataLoader, optimizer:Optimizer, ep:int, device:torch.device):
+def validate(model:nn.Module, test_dataloader:DataLoader, optimizer:Optimizer, ep:int,
+        device:int, criterion:nn.Module):
     '''验证模型
 
     Args:
@@ -126,7 +132,7 @@ def validate(model:nn.Module, test_dataloader:DataLoader, optimizer:Optimizer, e
         for X, y, _ in tqdm(test_dataloader, desc='Validating'):
             X, y = X.to(device), y.to(device)
             y_ = model(X)
-            loss = F.cross_entropy(y_, y, reduction='sum')
+            loss = criterion(y_, y)
             total_loss += loss.item()
             y_ = y_.argmax(dim=1)
             y_gd = y.cpu().numpy()
@@ -135,7 +141,7 @@ def validate(model:nn.Module, test_dataloader:DataLoader, optimizer:Optimizer, e
             mious.append(miou)
             mpas.append(mpa)
 
-    avg_loss = total_loss / len(test_dataloader)
+    avg_loss = total_loss / len(test_dataloader) / test_dataloader.batch_size
     miou = np.average(mious)
     mpa = np.average(mpas)
     test_info.append([ep, avg_loss, mpa, miou])
