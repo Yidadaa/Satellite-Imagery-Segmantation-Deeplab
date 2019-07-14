@@ -61,8 +61,8 @@ class SegDataset(Dataset):
         img = img.resize((config.im_w, config.im_h), resample=Image.BILINEAR) # type: Image.Image
 
         # # 随机高斯模糊
-        # if np.random.rand() < 0.5:
-        #     img = img.filter(ImageFilter.GaussianBlur(radius=np.random.rand()))
+        if np.random.rand() < 0.5:
+            img = img.filter(ImageFilter.GaussianBlur(radius=np.random.rand() * 1.5))
 
         # 随机旋转一定角度或者翻转
         for flag in [Image.FLIP_LEFT_RIGHT, Image.FLIP_TOP_BOTTOM,

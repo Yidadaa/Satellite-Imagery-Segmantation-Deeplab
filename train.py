@@ -42,7 +42,7 @@ class Trainer(object):
         self.ckpt = ckpt_path
         self.optimizer = Adam(self.model.parameters(), self.lr)
         self.criterion = self.setup_loss(loss_name)
-        self.writer = SummaryWriter(self.get_log_dir(log_dir))
+        self.writer = SummaryWriter(self.get_log_dir(log_dir), flush_secs=30)
 
     def get_log_dir(self, log_dir:str):
         return os.path.join(log_dir, self.get_comment())
@@ -63,8 +63,11 @@ class Trainer(object):
         }
         if loss_name not in loss_map:
             raise NotImplementedError(loss_name)
-        loss = loss_map[loss_name]().to(self.device)
-        return F.cross_entropy
+        params = {}
+        if loss_name in ['focal', 'ce', 'miou'] and self.weight is not None:
+            params['weight'] = self.weight
+        loss = loss_map[loss_name](**params).to(self.device)
+        return loss
 
     def setup_model(self, model_name:str, ckpt_path:str)->(nn.Module, int):
         '''配置模型
@@ -132,7 +135,7 @@ class Trainer(object):
             y = y.to(self.device) # type: torch.Tensor
             self.optimizer.zero_grad()
             y_ = self.model(X) # type: torch.Tensor
-            loss = self.criterion(y_, y, weight=self.weight) # type: torch.Tensor
+            loss = self.criterion(y_, y) # type: torch.Tensor
             loss.backward()
             self.optimizer.step()
 
@@ -198,7 +201,9 @@ if __name__ == "__main__":
     args = parse_args()
     assert os.path.exists(args.train_path), '请指定训练数据集路径'
     params = {
-        'loss_name': 'ce'
+        'loss_name': 'focal',
+        'weight': [1 - x for x in [0.6826871849591719, 0.09160297945818623, 0.07519184557703008, 0.15051799000561178]],
+        'lr': 1e-4
     }
     trainer = Trainer(args.train_path, args.restore_from, **params)
     trainer.train_on_epochs()
