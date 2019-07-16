@@ -1,6 +1,6 @@
 """PyTorch-compatible losses and loss functions.
 
-This file is a copy from: https://github.com/mapbox/robosat/blob/master/robosat/losses.py
+This file is a copy of: https://github.com/mapbox/robosat/blob/master/robosat/losses.py
 """
 
 import torch
