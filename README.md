@@ -1,5 +1,5 @@
 # Ali-Agriculture-AI-Challenge-2019
-阿里天池2019年县域农业大脑AI挑战赛
+阿里天池2019年县域农业大脑AI挑战赛，使用`deeplabv3`做卫星图语义分割。
 
 ## 依赖库
 ```
