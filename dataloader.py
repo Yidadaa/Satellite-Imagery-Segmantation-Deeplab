@@ -64,12 +64,17 @@ class SegDataset(Dataset):
         if np.random.rand() < 0.5:
             img = img.filter(ImageFilter.GaussianBlur(radius=np.random.rand() * 1.5))
 
-        # 随机旋转一定角度或者翻转
-        for flag in [Image.FLIP_LEFT_RIGHT, Image.FLIP_TOP_BOTTOM,
-                Image.ROTATE_90, Image.ROTATE_180, Image.ROTATE_270]:
-            if np.random.rand() < 0.5: continue
-            img = img.transpose(flag)
-            label = label.transpose(flag)
+        # 随机旋转
+        angle = int(np.random.random() * 360)
+        img = img.rotate(angle)
+        label = label.rotate(angle)
+
+        # # 随机旋转一定角度或者翻转
+        # for flag in [Image.FLIP_LEFT_RIGHT, Image.FLIP_TOP_BOTTOM,
+        #         Image.ROTATE_90, Image.ROTATE_180, Image.ROTATE_270]:
+        #     if np.random.rand() < 0.5: continue
+        #     img = img.transpose(flag)
+        #     label = label.transpose(flag)
         transform_funcs = [
             transforms.ToTensor(),
             transforms.Normalize(mean=self.mean, std=self.std)

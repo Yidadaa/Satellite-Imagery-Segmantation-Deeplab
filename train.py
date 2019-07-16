@@ -18,7 +18,7 @@ import json
 import time
 
 from dataloader import SegDataset
-from model import DeepLabV3Res101
+from model import DeepLabV3Res101, DeepLabV3Res50
 from utils import setup, get_metrics, restore_from, save_to
 from losses import FocalLoss2d, CrossEntropyLoss2d, mIoULoss2d, LovaszLoss2d
 import config
@@ -26,7 +26,7 @@ import config
 class Trainer(object):
     def __init__(self, data_path:str, ckpt_path:str = None, model_name:str = 'deeplab',
             loss_name:str = 'focal', log_dir:str = 'logs', lr:float = 1e-3,
-            weight:list = None):
+            weight:list = None, max_epoch:int = 30):
         '''
         Args:
             data_path(str): 训练数据存放位置
@@ -36,6 +36,7 @@ class Trainer(object):
         self.model_name = model_name
         self.loss_name = loss_name
         self.lr = lr
+        self.max_epoch = max_epoch
         self.weight = torch.Tensor(weight) if weight is not None else weight
         self.train_loader, self.val_loader = self.setup_dataloader(data_path)
         self.model, self.device, self.start_ep = self.setup_model(model_name, ckpt_path)
@@ -77,7 +78,8 @@ class Trainer(object):
             ckpt_path(str): 模型检查点路径
         '''
         model_map = {
-            'deeplab': DeepLabV3Res101
+            'deeplab': DeepLabV3Res101,
+            'deeplabres50': DeepLabV3Res50
         }
         if model_name not in model_map:
             raise NotImplementedError(model_name)
@@ -116,10 +118,11 @@ class Trainer(object):
         print('Size of training set: {}'.format(len(self.train_loader.dataset)))
         print('Size of val set: {}'.format(len(self.val_loader.dataset)))
         # 开始执行训练
-        for ep in range(self.start_ep, config.train_config['max_epoch']):
+        for ep in range(self.start_ep, self.max_epoch):
             self.train(ep)
             self.validate(ep)
             self.save_model(ep)
+        self.writer.close()
 
     def train(self, ep:int):
         '''训练模型
@@ -203,7 +206,8 @@ if __name__ == "__main__":
     params = {
         'loss_name': 'focal',
         'weight': [1 - x for x in [0.6826871849591719, 0.09160297945818623, 0.07519184557703008, 0.15051799000561178]],
-        'lr': 1e-4
+        'lr': 1e-4,
+        'max_epoch': 30
     }
     trainer = Trainer(args.train_path, args.restore_from, **params)
     trainer.train_on_epochs()

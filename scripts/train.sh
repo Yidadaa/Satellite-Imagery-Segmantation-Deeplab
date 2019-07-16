@@ -1,1 +1,1 @@
-CUDA_VISIBLE_DEVICES=2,3 python train.py -t ./data/train -r ./checkpoints/deeplab_ce_startfrom_19_0.001_withweight_2019-07-14_16:15:15/ep-21.pth
+CUDA_VISIBLE_DEVICES=0,2,3 python train.py -t ./data/train

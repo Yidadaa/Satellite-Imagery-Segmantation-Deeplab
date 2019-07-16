@@ -18,20 +18,8 @@ dataloader_config = {
     'drop_last': True
 }
 
-# 数据集参数配置
-# dataset_config = {
-#     'mean': [0, 0, 0],
-#     'std': [1, 1, 1]
-# }
-
 dataset_config = {
     'mean': [0.45666892, 0.52336701, 0.52904614],
     'std': [0.19727931, 0.20078927, 0.23028788],
     'use_jitter': True
-}
-
-# 训练时参数
-train_config = {
-    'max_epoch': 30,
-    'lr': 1e-5
 }

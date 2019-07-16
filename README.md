@@ -15,6 +15,7 @@ pip install opencv-python
 1. 将RGBA图片处理为RGB图片，其中透明度为0的区域像素值设置为`(0, 0, 0)`，其他则直接提取出RGB通道。
 2. 数据增强，包括多尺度裁剪、随机裁剪、多角度旋转（90/180/270）、镜像、翻转等。
 3. 减去均值，做归一化。
+4. 随机高斯模糊、对比度、色调等操作。
 
 |Scale|Mean|Std|
 |-|-|-|
@@ -26,16 +27,12 @@ pip install opencv-python
 ## 网络设置
 采取`pytorch`内置的`deeplabv3_resnet101`网络，由于PASCAL数据集与卫星云图数据集相差较远，所以不采用预训练权重。
 
-## 训练策略
-[TODO]
-
-##  疑问
-1. pvvips读入的图片是`RGB`还是`BGR`排列？
-
 ## TODO
 - [x] `metrics`函数
+- [x] `refine`函数
 
 ## 分数
 1. [0.20] refined, 1280, scales = [480, 600, 960, 1280]
 2. [0.22] no refine, 1280, scales = [480, 600, 960, 1280]
 3. [0.22] no refine, 480, scales = [224, 320, 480]
+4. [0.23] no refine, focal weighted loss, 256, scales = [256, 480]
